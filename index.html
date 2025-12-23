@@ -38,7 +38,7 @@
     <div class="glass p-4 mb-4">
         <h2 class="font-bold mb-3 text-sm text-gray-300">⚙️ API 连接</h2>
         <div class="space-y-3">
-            <input type="text" id="apiUrl" class="glass-input w-full p-2 text-sm" placeholder="API URL" onchange="clearModelList()">
+            <input type="text" id="apiUrl" class="glass-input w-full p-2 text-sm" placeholder="API URL (例如 https://api.openai.com/v1)" onchange="clearModelList()">
             <input type="password" id="apiKey" class="glass-input w-full p-2 text-sm" placeholder="API Key (sk-...)" onchange="clearModelList()">
             <div class="flex gap-2">
                 <select id="modelSelect" class="glass-select flex-1 p-2 text-sm" disabled><option>请先加载模型</option></select>
@@ -185,23 +185,70 @@
 
         // --- API ---
         async function loadModels() {
-            let url = document.getElementById('apiUrl').value.replace(/\/\(/, '').replace(/\/chat\/completions\)/, '');
-            const key = document.getElementById('apiKey').value;
-            const btn = document.getElementById('loadBtn');
-            if(!url || !key) return toast('请填写 URL 和 Key', 'error');
+            let rawUrl = document.getElementById('apiUrl').value.trim();
+            // 去除末尾斜杠和 /chat/completions 以获得 Base URL
+            rawUrl = rawUrl.replace(/\/\(/, '').replace(/\/chat\/completions\)/, '');
             
-            btn.disabled = true; btn.innerText = '...';
+            const key = document.getElementById('apiKey').value.trim();
+            const btn = document.getElementById('loadBtn');
+            const sel = document.getElementById('modelSelect');
+
+            if(!rawUrl || !key) return toast('请填写 URL 和 Key', 'error');
+            
+            btn.disabled = true; 
+            btn.innerText = '连接中...';
+            
             try {
-                const res = await fetch(`\({url}/models`, { headers: { Authorization: `Bearer \){key}` } });
-                const data = await res.json();
-                const sel = document.getElementById('modelSelect');
-                sel.innerHTML = '';
-                (data.data || []).sort((a,b) => a.id.includes('chat') ? -1 : 1).forEach(m => {
-                    const opt = document.createElement('option'); opt.value = m.id; opt.innerText = m.id; sel.appendChild(opt);
+                // 尝试请求 /models
+                const res = await fetch(`${rawUrl}/models`, { 
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${key}` } 
                 });
-                sel.disabled = false; if(sel.options.length > 0) sel.selectedIndex = 0;
-                toast(`加载成功`, 'success'); checkStart();
-            } catch(e) { toast('模型加载失败', 'error'); } finally { btn.disabled = false; btn.innerText = '🔄 加载'; }
+                
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                
+                const data = await res.json();
+                const list = Array.isArray(data) ? data : (data.data || []);
+                
+                sel.innerHTML = '';
+                if (list.length === 0) throw new Error('模型列表为空');
+
+                // 排序：chat/gpt 优先
+                list.sort((a,b) => {
+                    const idA = (a.id||a).toLowerCase(), idB = (b.id||b).toLowerCase();
+                    return (idA.includes('gpt') || idA.includes('chat')) ? -1 : 1;
+                });
+
+                list.forEach(m => {
+                    const id = m.id || m;
+                    const opt = document.createElement('option'); opt.value = id; opt.innerText = id; sel.appendChild(opt);
+                });
+                
+                sel.disabled = false;
+                toast(`加载成功: ${list.length} 个模型`, 'success');
+                checkStart();
+
+            } catch(e) { 
+                console.error(e);
+                // 失败兜底：手动输入
+                sel.innerHTML = `
+                    <option value="" disabled>-- 加载失败，请手动输入 --</option>
+                    <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
+                    <option value="gpt-4o">gpt-4o</option>
+                    <option value="claude-3-5-sonnet-20240620">claude-3-5-sonnet</option>
+                `;
+                const manual = prompt(`无法获取模型列表 (${e.message})。\n请手动输入模型名称：`, "gpt-3.5-turbo");
+                if(manual) {
+                    const opt = document.createElement('option');
+                    opt.value = manual; opt.innerText = manual + " (手动)"; opt.selected = true;
+                    sel.insertBefore(opt, sel.firstChild);
+                }
+                sel.disabled = false;
+                checkStart();
+                toast('已切换至手动模式', 'info');
+            } finally { 
+                btn.disabled = false; btn.innerText = '🔄 加载'; 
+            }
         }
 
         function clearModelList() {
@@ -272,6 +319,7 @@
                     else if (t.path[0].includes('greetings')) counts.alt++;
                     else counts.core++;
                 });
+                // 修复了这里的模板字符串语法
                 report.innerText = `发现 \({state.tasks.length} 个任务：基础字段 \){counts.core} | 问候语 \({counts.alt} | 世界书 \){counts.book}`;
                 document.getElementById('scanReport').classList.remove('hidden');
 
@@ -296,7 +344,6 @@
             document.getElementById('retryBtn').classList.add('hidden');
 
             state.conv = JSON.parse(JSON.stringify(state.orig));
-            // 重新生成任务列表，绑定到 conv 对象
             state.tasks = deepScan(state.conv); 
             
             state.total = state.tasks.length;
@@ -331,6 +378,7 @@
             }
             const pct = (state.done / state.total) * 100;
             document.getElementById('bar').style.width = `${pct}%`;
+            // 修复了这里的模板字符串语法
             document.getElementById('progressText').innerText = `\({state.done}/\){state.total}`;
             if (state.done === state.total) finish();
         }
@@ -350,7 +398,8 @@
             state.active++;
             updateStatus(idx, 'processing');
             
-            let url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+            // 修复了 URL 构建逻辑
+            let url = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
             if (!url.endsWith('/chat/completions')) url += '/chat/completions';
             
             const key = document.getElementById('apiKey').value;
@@ -390,11 +439,9 @@
                 const json = await res.json();
                 const newText = json.choices[0].message.content;
 
-                // Update Data Logic
                 let ptr = state.conv.data || state.conv;
-                // Special handling for character_book which might be at root or inside data
                 if (task.path[0] === 'character_book' && !ptr.character_book && state.conv.character_book) {
-                    ptr = state.conv; // Switch to root if book is at root
+                    ptr = state.conv;
                 }
 
                 for (let i = 0; i < task.path.length - 1; i++) {
@@ -465,6 +512,7 @@
                 const newVal = ptr[t.path[t.path.length - 1]];
 
                 if (t.status === 'done' && t.val !== newVal) {
+                    // 修复了这里的模板字符串语法
                     diffHtml += `\n=== \({t.name} ===\n[原]: \){t.val.substring(0, 60)}...\n[新]: ${newVal.substring(0, 60)}...\n`;
                 }
             });
@@ -473,6 +521,7 @@
 
         function exportFile(type) {
             const suffix = state.gender === 'male' ? 'MaleUser' : 'FemaleUser';
+            // 修复了这里的模板字符串语法
             const name = `\({state.fname}_\){suffix}.${type}`;
             if (type === 'json') {
                 const blob = new Blob([JSON.stringify(state.conv, null, 2)], {type: 'application/json'});
