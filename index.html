@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡重构台 (JSON隔离版)</title>
+    <title>角色卡重构台 (行锁死版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #09090b; color: #e4e4e7; font-family: sans-serif; padding-bottom: 40px; }
@@ -17,7 +17,7 @@
             padding: 12px 16px;
             display: flex; justify-content: space-between; align-items: center;
         }
-        .nav-title { font-weight: 800; font-size: 1.1rem; color: #34d399; } /* 绿色代表稳定 */
+        .nav-title { font-weight: 800; font-size: 1.1rem; color: #f87171; } /* 红色代表最终防线 */
         
         #settingsPanel { background: #18181b; border-bottom: 1px solid #27272a; padding: 16px; display: none; }
 
@@ -60,7 +60,7 @@
 <body>
 
     <div class="navbar">
-        <div class="nav-title">🧬 角色重构台 (JSON隔离版)</div>
+        <div class="nav-title">🧬 角色重构台 (行锁死版)</div>
         <button onclick="toggleSettings()" style="font-size:20px; background:none; border:none;">⚙️</button>
     </div>
 
@@ -194,17 +194,16 @@
             var avoid = gender === 'male' ? '她' : '他';
             var want = gender === 'male' ? '他' : '她';
 
-            // 【JSON 隔离 Prompt】
-            // 核心思路：让 AI 处理 JSON 数组，这样它就碰不到换行符了
+            // 【行锁死 Prompt】
+            // 核心指令：告诉 AI 它处理的是一个数组，绝对不能合并数组项
             var prompt = 
-                "你是一个JSON数组处理器。你不仅要修改性别，还要根据新性别修改生理特征和动作描写。\n" +
-                "【任务】：\n" +
-                "1. 接收一个字符串数组。\n" +
-                "2. 遍历数组中的每个字符串，将指代User的词汇改为【" + target + "】，代词【" + avoid + "】改为【" + want + "】。\n" +
-                "3. 【重点】：识别User是" + target + "，遇到色情/互动描写，必须修改器官和动作以符合解剖学逻辑（如将女性特征改为男性特征）。\n" +
-                "4. 严禁修改 XML 标签（如 <tag>）。\n" +
-                "5. 返回一个标准的 JSON 字符串数组，长度必须与输入一致。\n" +
-                "6. 不要输出 Markdown 代码块，直接输出 JSON。";
+                "你是一个JSON数组处理器。任务：\n" +
+                "1. 我会发给你一个字符串数组。\n" +
+                "2. 请修改数组中每个字符串的性别指代（User改为【" + target + "】，【" + avoid + "】改为【" + want + "】）。\n" +
+                "3. 修改生理/NSFW描述以匹配" + target + "。\n" +
+                "4. ⚠️ 严禁修改数组结构！严禁合并数组项！\n" +
+                "5. 严禁修改 XML 标签（如 <tag>）。\n" +
+                "6. 直接返回 JSON 数组，不要代码块标记。";
 
             var count = 0;
             for (var i = 0; i < blocks.length; i++) {
@@ -218,8 +217,8 @@
                 document.getElementById('statusText').innerText = "处理中 " + count + "/" + blocks.length;
                 block.parentElement.style.opacity = '0.5';
 
-                // 【核心：JSON 切割】
-                // 1. 按换行符切割成数组
+                // 【核心：物理切片】
+                // 把文本按换行符切成数组。AI 只能看到一行行的字，看不到换行符，所以没法删换行符。
                 var lines = txt.split('\n');
                 var jsonPayload = JSON.stringify(lines);
 
@@ -230,14 +229,13 @@
 
                     if (jsonResponse) {
                         try {
-                            // 尝试解析返回的 JSON
-                            // 有时候 AI 会加 ```json ... ```，先清洗一下
+                            // 清洗 AI 可能返回的 Markdown 标记
                             var cleanJson = jsonResponse.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
                             var newLines = JSON.parse(cleanJson);
 
                             if (Array.isArray(newLines)) {
                                 // 【核心：物理还原】
-                                // 将数组重新拼回字符串，换行符由我们控制，AI 无法干涉
+                                // 把 AI 改好的单行，用换行符重新拼起来
                                 var newTxt = newLines.join('\n');
                                 
                                 if (newTxt !== txt) {
@@ -248,11 +246,11 @@
                                     })(block);
                                 }
                             } else {
-                                console.error("AI 返回的不是数组");
+                                console.error("AI 返回格式错误，非数组");
                             }
                         } catch (parseErr) {
-                            console.error("JSON 解析失败", parseErr);
-                            // 如果 JSON 解析失败，说明 AI 没听话，这里可以加个兜底，或者直接跳过
+                            console.error("JSON 解析失败: " + parseErr);
+                            // 如果 AI 偶尔犯傻没返回 JSON，我们就不改这一段，保证不坏
                         }
                     }
                 } catch (e) {
@@ -280,7 +278,7 @@
                 body: JSON.stringify({
                     model: model,
                     messages: [{role:'system',content:sys},{role:'user',content:text}],
-                    temperature: 0.1, // 极低温度保证 JSON 格式正确
+                    temperature: 0.1, // 极低温度，确保 JSON 格式稳定
                     max_tokens: 4000
                 })
             });
