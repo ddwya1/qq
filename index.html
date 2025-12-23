@@ -54,7 +54,8 @@
             width: 100%;
             margin: 8px 0;
         }
-        .btn:disabled { opacity: 0.5; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); }
         .btn-male { background: linear-gradient(135deg, #667eea, #4c9aff); }
         .btn-female { background: linear-gradient(135deg, #f093fb, #f5576c); }
         .loader {
@@ -159,11 +160,9 @@
             <h3 style="margin-bottom:15px;">🤖 API 配置</h3>
             <input type="text" id="apiUrl" placeholder="API URL (如: https://api.deepseek.com/v1/chat/completions)">
             <input type="password" id="apiKey" placeholder="API Key (如: sk-...)">
-            <select id="model">
-                <option value="deepseek-chat">deepseek-chat（推荐）</option>
-                <option value="gpt-4-turbo">gpt-4-turbo</option>
-                <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-            </select>
+            <input type="text" id="modelInput" placeholder="模型名称 (如: deepseek-chat)" style="margin-bottom:8px;">
+            <button class="btn btn-primary" id="btnFetchModels" style="font-size:14px;">📋 自动获取模型列表</button>
+            <p style="font-size:12px;color:#999;margin-top:8px;">💡 推荐直接填写：deepseek-chat</p>
         </div>
 
         <div class="section">
@@ -212,24 +211,70 @@
             male: /\b(he|him|boy|man|male|哥|弟|他|男|阴茎|后穴|肉棒|精液)\b/gi
         };
 
-        ['apiUrl','apiKey','model'].forEach(k => {
+        // 加载保存配置
+        ['apiUrl','apiKey','modelInput'].forEach(k => {
             const el = $(k);
             el.value = localStorage.getItem(k) || '';
             el.oninput = () => localStorage.setItem(k, el.value);
         });
 
+        // 上传交互
         \(('uploadArea').onclick = () => \)('fileInput').click();
         \(('uploadArea').ondragover = e => { e.preventDefault(); \)('uploadArea').style.background = '#f0fff4'; };
         \(('uploadArea').ondragleave = () => \)('uploadArea').style.background = 'white';
         $('uploadArea').ondrop = e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); };
         $('fileInput').onchange = e => handleFile(e.target.files[0]);
+        
+        // 按钮事件
         $('btnMale').onclick = () => convert('male');
         $('btnFemale').onclick = () => convert('female');
+        $('btnFetchModels').onclick = fetchModels;
         \(('btnCancel').onclick = () => \)('previewModal').classList.remove('show');
         $('btnConfirm').onclick = apply;
 
+        // 获取模型列表
+        async function fetchModels() {
+            if (!\(('apiUrl').value || !\)('apiKey').value) {
+                return toast('请先填写 API URL 和 Key', 'error');
+            }
+            
+            showLoader('获取模型列表中...');
+            try {
+                let url = \(('apiUrl').value.replace(/\/chat\/completions\/?\)/, '/models');
+                if (!url.includes('/models')) {
+                    url = $('apiUrl').value.split('/v1')[0] + '/v1/models';
+                }
+
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer \({\)('apiKey').value}` }
+                });
+
+                if (!res.ok) throw new Error(`请求失败: ${res.status}`);
+                const data = await res.json();
+                
+                let models = [];
+                if (data.data?.length) models = data.data.map(m => m.id).filter(Boolean);
+                else if (Array.isArray(data)) models = data.map(m => m.id || m).filter(Boolean);
+
+                hideLoader();
+                
+                if (models.length === 0) throw new Error('未找到模型');
+
+                // 显示选择弹窗
+                const choice = prompt(`找到 ${models.length} 个模型，请复制你想用的:\n\n` + models.join('\n'));
+                if (choice) {
+                    $('modelInput').value = choice;
+                    localStorage.setItem('modelInput', choice);
+                    toast('模型已设置', 'success');
+                }
+            } catch (e) {
+                hideLoader();
+                toast('获取失败: ' + e.message, 'error');
+            }
+        }
+
         async function handleFile(file) {
-            if (!file || file.type !== 'image/png') return alert('请上传 PNG 文件');
+            if (!file || file.type !== 'image/png') return toast('请上传 PNG 文件', 'error');
             showLoader('读取中...');
             try {
                 const buf = await file.arrayBuffer();
@@ -246,7 +291,7 @@
                 toast('加载成功', 'success');
             } catch (e) {
                 hideLoader();
-                alert('读取失败: ' + e.message);
+                toast('读取失败: ' + e.message, 'error');
             }
         }
 
@@ -269,8 +314,9 @@
         }
 
         async function convert(target) {
-            if (!\(('apiUrl').value || !\)('apiKey').value) return alert('请先配置 API');
-            if (!currentCard) return alert('请先上传角色卡');
+            if (!\(('apiUrl').value || !\)('apiKey').value) return toast('请先配置 API', 'error');
+            if (!$('modelInput').value) return toast('请先填写模型名称', 'error');
+            if (!currentCard) return toast('请先上传角色卡', 'error');
             
             showLoader('分析中...');
             try {
@@ -315,11 +361,11 @@
                 }
 
                 hideLoader();
-                if (diffs.length === 0) return alert('未检测到需要修改的内容');
+                if (diffs.length === 0) return toast('未检测到需要修改的内容', 'info');
                 showPreview(diffs,card,target);
             } catch (e) {
                 hideLoader();
-                alert('转换失败: ' + e.message);
+                toast('转换失败: ' + e.message, 'error');
             }
         }
 
@@ -333,7 +379,7 @@
                 method:'POST',
                 headers: {'Content-Type':'application/json','Authorization':`Bearer \({\)('apiKey').value}`},
                 body: JSON.stringify({
-                    model: $('model').value,
+                    model: $('modelInput').value,
                     messages: [{role:'user',content:prompt}],
                     temperature: 0
                 })
@@ -387,7 +433,7 @@
                 toast(`转换完成！已修改 ${diffs.length} 处`,'success');
             } catch (e) {
                 hideLoader();
-                alert('打包失败: ' + e.message);
+                toast('打包失败: ' + e.message, 'error');
             }
         }
 
@@ -458,9 +504,10 @@
             $('loader').classList.remove('show');
         }
 
-        function toast(msg,type) {
+        function toast(msg, type='info') {
+            const colors = {success:'#51cf66',error:'#ff6b6b',info:'#667eea'};
             const d = document.createElement('div');
-            d.style.cssText = `position:fixed;top:20px;right:20px;padding:15px 25px;border-radius:10px;color:white;font-weight:600;z-index:10001;background:${type==='success'?'#51cf66':'#667eea'}`;
+            d.style.cssText = `position:fixed;top:20px;right:20px;padding:15px 25px;border-radius:10px;color:white;font-weight:600;z-index:10001;background:${colors[type]};box-shadow:0 4px 15px rgba(0,0,0,0.3);animation:slideIn 0.3s;`;
             d.textContent = msg;
             document.body.appendChild(d);
             setTimeout(() => d.remove(), 3000);
