@@ -41,6 +41,7 @@
             text-align: center;
             cursor: pointer;
             background: white;
+            transition: all 0.3s;
         }
         .upload-area:hover { background: #f8f9ff; }
         .btn {
@@ -53,8 +54,10 @@
             color: white;
             width: 100%;
             margin: 8px 0;
+            transition: transform 0.2s;
         }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn:hover { transform: translateY(-2px); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
         .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); }
         .btn-male { background: linear-gradient(135deg, #667eea, #4c9aff); }
         .btn-female { background: linear-gradient(135deg, #f093fb, #f5576c); }
@@ -148,6 +151,7 @@
         }
         @media (max-width: 768px) {
             .diff-grid { grid-template-columns: 1fr; }
+            .container { padding: 20px; }
         }
     </style>
 </head>
@@ -185,7 +189,7 @@
     <div class="loader" id="loader">
         <div style="text-align:center;color:white;">
             <div class="spinner"></div>
-            <p id="loaderText">处理中...</p>
+            <p id="loaderText" style="margin-top:20px;">处理中...</p>
         </div>
     </div>
 
@@ -222,7 +226,7 @@
         \(('uploadArea').onclick = () => \)('fileInput').click();
         \(('uploadArea').ondragover = e => { e.preventDefault(); \)('uploadArea').style.background = '#f0fff4'; };
         \(('uploadArea').ondragleave = () => \)('uploadArea').style.background = 'white';
-        $('uploadArea').ondrop = e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); };
+        \(('uploadArea').ondrop = e => { e.preventDefault(); \)('uploadArea').style.background = 'white'; handleFile(e.dataTransfer.files[0]); };
         $('fileInput').onchange = e => handleFile(e.target.files[0]);
         
         // 按钮事件
