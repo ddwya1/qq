@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡重构台 (绝对保真版)</title>
+    <title>角色卡重构台 (结构锁死版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* 基础设置 */
@@ -19,7 +19,7 @@
             padding: 12px 16px;
             display: flex; justify-content: space-between; align-items: center;
         }
-        .nav-title { font-weight: 800; font-size: 1.1rem; color: #10b981; } /* 绿色代表安全/保真 */
+        .nav-title { font-weight: 800; font-size: 1.1rem; color: #a78bfa; } /* 紫色代表魔法/结构 */
         
         /* 设置面板 */
         #settingsPanel { background: #18181b; border-bottom: 1px solid #27272a; padding: 16px; display: none; }
@@ -43,12 +43,12 @@
         .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
         .card-header { background: #27272a; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #a1a1aa; display: flex; justify-content: space-between; }
         
-        /* 核心：完全保留原始格式的显示 */
+        /* 核心修复：增加行高，提升阅读体验 */
         .text-content {
             background: #09090b; color: #d4d4d8; padding: 14px; 
-            font-family: monospace; font-size: 13px; line-height: 1.5;
-            white-space: pre-wrap; /* 保留所有空格和换行 */
-            word-break: break-all;
+            font-family: monospace; font-size: 13px; line-height: 1.8; /* 增加行间距 */
+            white-space: pre-wrap; 
+            word-wrap: break-word;
             border-top: 1px solid #27272a;
         }
         
@@ -67,7 +67,7 @@
 <body>
 
     <div class="navbar">
-        <div class="nav-title">🧬 角色重构台 (绝对保真)</div>
+        <div class="nav-title">🧬 角色重构台 (结构锁死)</div>
         <button onclick="toggleSettings()" style="font-size:20px; background:none; border:none;">⚙️</button>
     </div>
 
@@ -201,18 +201,20 @@
             var avoid = gender === 'male' ? '她' : '他';
             var want = gender === 'male' ? '他' : '她';
 
-            // 【绝对保真 Prompt】
-            // 重点：强调不要动符号，不要动结构
+            // 【结构锁死 Prompt】
+            // 我们告诉 AI 这是一个代码文件，【LAYER_BREAK】是系统关键字，绝对不能动
             var prompt = 
-                "你是一个【字符串替换程序】。任务：替换文本中的性别词汇。\n" +
-                "【替换规则】：\n" +
-                "1. User性别改为【" + target + "】。代词【" + avoid + "】->【" + want + "】。\n" +
-                "2. 生理/NSFW描述：按" + target + "解剖学逻辑修改。\n" +
-                "【格式铁律】：\n" +
-                "1. 原文中的【§¶§】代表换行符，**必须原样保留**，位置不能动，数量不能变！\n" +
-                "2. 严禁添加或删除空格！严禁修改 XML 标签！\n" +
-                "3. 严禁修改 {{user}} 等占位符。\n" +
-                "4. 只要输出修改后的文本，不要任何解释。";
+                "你是一个【代码变量替换器】。你正在处理一段包含系统标记的代码文本。\n" +
+                "【任务】：\n" +
+                "1. 找到所有指代User的变量，将其性别逻辑改为【" + target + "】。\n" +
+                "2. 将代词【" + avoid + "】替换为【" + want + "】。\n" +
+                "3. 修改生理/NSFW描述以匹配" + target + "。\n" +
+                "【绝对禁令】：\n" +
+                "1. 文中所有的【LAYER_BREAK】是系统换行符，**严禁删除或移动**！\n" +
+                "2. 必须保持【LAYER_BREAK】的数量和位置与原文一致！\n" +
+                "3. 严禁修改 < > 标签。\n" +
+                "4. 严禁修改 {{user}} 占位符。\n" +
+                "5. 直接输出修改后的代码块，不要解释。";
 
             var count = 0;
             for (var i = 0; i < blocks.length; i++) {
@@ -226,10 +228,10 @@
                 document.getElementById('statusText').innerText = "处理中 " + count + "/" + blocks.length;
                 block.parentElement.style.opacity = '0.5';
 
-                // 【核心技术：换行符冷冻】
-                // 将 \n 替换为极罕见的字符组合 §¶§，强制 AI 把它当成一个“单词”处理
-                // 这样 AI 就绝对不会合并段落，也不会自作聪明地排版了
-                var encodedTxt = txt.replace(/\n/g, "§¶§");
+                // 【核心：伪装成代码】
+                // 1. 处理 \r\n 和 \n
+                // 2. 用 LAYER_BREAK 替换换行，这看起来像个编程常量，AI 不敢动它
+                var encodedTxt = txt.replace(/\r\n/g, "\n").replace(/\n/g, "【LAYER_BREAK】");
 
                 try {
                     var newTxt = await callAi(encodedTxt, prompt, model);
@@ -237,13 +239,13 @@
                     if (shouldStop) { block.parentElement.style.opacity = '1'; alert('已停止'); break; }
 
                     if (newTxt) {
-                        // 【解冻】
-                        // 将 §¶§ 还原回 \n
-                        newTxt = newTxt.replace(/§¶§/g, "\n");
+                        // 【还原】
+                        // 把 LAYER_BREAK 变回换行
+                        newTxt = newTxt.replace(/【LAYER_BREAK】/g, "\n");
                         
-                        // 移除 AI 可能产生的首尾空格（防止 AI 在开头加空格）
-                        // 但不移除中间的空格
-                        // newTxt = newTxt.trim(); // 慎用 trim，可能会删掉必要的开头换行
+                        // 【兜底修复】
+                        // 如果 AI 还是发疯把标签粘连了，这里强制拆开
+                        newTxt = newTxt.replace(/>\s*</g, ">\n<");
 
                         if (newTxt !== txt) {
                             block.textContent = newTxt;
@@ -291,7 +293,6 @@
             var json = await res.json();
             if (json.choices && json.choices.length > 0) {
                 var content = json.choices[0].message.content;
-                // 清理可能存在的 Markdown 代码块包裹
                 content = content.replace(/^```.*\n/g, '').replace(/\n```$/g, '');
                 return content;
             }
