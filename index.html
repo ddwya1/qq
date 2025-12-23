@@ -3,364 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡重构台 (分块流水线版)</title>
+    <title>角色卡解析助手 (BL专用版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #09090b; color: #e4e4e7; font-family: sans-serif; padding-bottom: 40px; }
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
         .hidden { display: none !important; }
 
+        /* 顶部导航 */
         .navbar {
             position: sticky; top: 0; z-index: 50;
             background: rgba(24, 24, 27, 0.95); backdrop-filter: blur(12px);
             border-bottom: 1px solid #27272a;
             padding: 12px 16px;
-            display: flex; justify-content: space-between; align-items: center;
+            display: flex; justify-content: center; align-items: center;
         }
-        .nav-title { font-weight: 800; font-size: 1.1rem; color: #fbbf24; } /* 金色代表工业级稳定 */
+        .nav-title { font-weight: 800; font-size: 1.1rem; color: #60a5fa; }
         
-        #settingsPanel { background: #18181b; border-bottom: 1px solid #27272a; padding: 16px; display: none; }
-
-        .input-dark {
-            background: #27272a; border: 1px solid #3f3f46; color: white;
-            padding: 10px; border-radius: 8px; width: 100%; font-size: 14px; margin-bottom: 8px;
+        /* 提示词区域 */
+        .prompt-box {
+            background: #18181b; border: 1px solid #3b82f6; 
+            border-radius: 12px; padding: 16px; margin: 16px;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1);
         }
+        .prompt-text {
+            background: #09090b; color: #93c5fd; padding: 10px;
+            font-size: 12px; line-height: 1.5; border-radius: 8px;
+            border: 1px dashed #3b82f6; margin-bottom: 10px;
+            white-space: pre-wrap;
+        }
+
+        /* 按钮 */
         .btn {
             display: flex; justify-content: center; align-items: center;
-            padding: 10px; border-radius: 8px; font-weight: 600; font-size: 14px;
-            border: none; width: 100%; margin-bottom: 5px;
+            padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 14px;
+            border: none; cursor: pointer; transition: transform 0.1s; width: 100%;
         }
+        .btn:active { transform: scale(0.98); }
         .btn-blue { background: #2563eb; color: white; }
-        .btn-red { background: #dc2626; color: white; }
-        .btn-gray { background: #3f3f46; color: white; }
-        .btn-stop { background: #ef4444; color: white; padding: 4px 12px; font-size: 12px; border-radius: 20px; margin-left: 10px; }
-        
+        .btn-copy-sm { background: #374151; color: white; padding: 4px 10px; font-size: 12px; width: auto; }
+
+        /* 卡片样式 */
         .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
-        .card-header { background: #27272a; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #a1a1aa; display: flex; justify-content: space-between; }
-        
+        .card-header { 
+            background: #27272a; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #a1a1aa; 
+            display: flex; justify-content: space-between; align-items: center;
+        }
         .text-content {
             background: #09090b; color: #d4d4d8; padding: 14px; 
             font-family: monospace; font-size: 13px; line-height: 1.6;
-            white-space: pre-wrap; 
-            word-wrap: break-word;
+            white-space: pre-wrap; word-break: break-all;
             border-top: 1px solid #27272a;
         }
-        
-        .highlight-change { animation: flash 1.5s; }
-        @keyframes flash { 0% { background: rgba(16, 185, 129, 0.2); } 100% { background: #09090b; } }
-        .upload-box { border: 2px dashed #3f3f46; border-radius: 12px; padding: 40px 20px; text-align: center; color: #71717a; margin: 16px; }
-        
-        /* 进度条 */
-        .progress-container { width: 100%; background-color: #27272a; height: 4px; border-radius: 2px; margin-top: 8px; overflow: hidden; display: none; }
-        .progress-bar { height: 100%; background-color: #fbbf24; width: 0%; transition: width 0.3s; }
+
+        .upload-box { 
+            border: 2px dashed #3f3f46; border-radius: 12px; padding: 40px 20px; 
+            text-align: center; color: #71717a; margin: 16px; 
+        }
     </style>
-    <script>
-        window.onerror = function(msg, url, line) {
-            alert("错误:\n" + msg + "\n行: " + line);
-            return false;
-        };
-    </script>
 </head>
 <body>
 
     <div class="navbar">
-        <div class="nav-title">🧬 角色重构台 (工业流水线)</div>
-        <button onclick="toggleSettings()" style="font-size:20px; background:none; border:none;">⚙️</button>
+        <div class="nav-title">🧬 角色卡解析助手</div>
     </div>
 
-    <div id="settingsPanel">
-        <input type="text" id="apiUrl" class="input-dark" placeholder="API URL">
-        <input type="password" id="apiKey" class="input-dark" placeholder="API Key">
-        <div class="flex gap-2">
-            <button onclick="loadModels()" id="loadBtn" class="btn btn-blue">连接服务器</button>
-            <select id="modelSelect" class="input-dark" disabled><option>请先连接</option></select>
+    <!-- 1. 专用提示词区域 -->
+    <div class="prompt-box">
+        <div class="flex justify-between items-center mb-2">
+            <span class="text-xs font-bold text-blue-400">✨ 改写提示词 (BL/男男专用)</span>
         </div>
+        <!-- 这里是你要发给 AI 的话 -->
+        <div id="promptText" class="prompt-text">你是一个专业的BL小说改写助手。请帮我修改发送给你的文本：
+1. 【核心任务】：将User的性别设定为【男性】，将指代User的代词改为“他”。
+2. 【NSFW/生理修正】：
+   - 识别这是两个男性的互动。
+   - 如果文中有色情/亲密描写，必须根据【男性生理构造】修改器官和动作（例如：将女性特征改为后穴、肠液、前列腺、勃起等）。
+   - 如果没有色情内容，则只修改性别代词。
+3. 【格式死命令】：
+   - 严禁删除换行符！严禁合并段落！
+   - 严禁修改 XML 标签（如 <tag>）和列表符号。
+   - 保持原文的排版格式一模一样。
+4. 直接输出修改后的文本，不要任何解释。</div>
+        <button class="btn btn-blue" onclick="copyPrompt()">📋 一键复制提示词</button>
     </div>
 
-    <div class="p-4 flex flex-col gap-3">
-        <div class="bg-[#18181b] p-3 rounded-xl border border-[#27272a]">
-            <div class="flex justify-between items-center mb-2">
-                <span class="text-xs font-bold text-blue-400">AI 智能改写</span>
-                <div id="aiStatus" class="hidden flex items-center">
-                    <span id="statusText" class="text-xs text-yellow-500">准备中...</span>
-                    <button onclick="stopAiConvert()" class="btn-stop">⏹️ 停止</button>
-                </div>
-            </div>
-            <div id="progressBarContainer" class="progress-container">
-                <div id="progressBar" class="progress-bar"></div>
-            </div>
-            <div class="flex gap-2 mt-2">
-                <button onclick="startAiConvert('male')" class="btn btn-blue">♂ 转男 (BL/BG)</button>
-                <button onclick="startAiConvert('female')" class="btn btn-red">♀ 转女 (BG/GL)</button>
-            </div>
-        </div>
-
-        <div class="bg-[#18181b] p-3 rounded-xl border border-[#27272a]">
-            <div class="text-xs font-bold text-gray-500 mb-2">手动替换</div>
-            <div class="flex gap-2">
-                <input type="text" id="findText" class="input-dark" placeholder="查找">
-                <input type="text" id="replaceText" class="input-dark" placeholder="替换">
-            </div>
-            <button onclick="applyManualReplace()" class="btn btn-gray">执行替换</button>
-        </div>
-    </div>
-
+    <!-- 2. 上传区域 -->
     <div id="dropZone" class="upload-box" onclick="document.getElementById('fileInput').click()">
         <input type="file" id="fileInput" class="hidden" accept=".png,.json" onchange="handleFile(this.files[0])">
         <div class="text-4xl mb-2">📂</div>
-        <div class="text-sm">点击上传角色卡</div>
+        <div class="text-sm">点击上传角色卡 (PNG/JSON)</div>
     </div>
 
+    <!-- 3. 内容列表 -->
     <div id="contentArea" class="hidden px-4 pb-10">
         <div class="text-xs font-bold text-gray-500 mb-2 mt-4 uppercase">基础信息</div>
         <div id="charContainer"></div>
+
         <div class="flex justify-between items-end mb-2 mt-6">
-            <div class="text-xs font-bold text-gray-500 uppercase">世界书</div>
+            <div class="text-xs font-bold text-gray-500 uppercase">世界书 / 知识库</div>
             <div id="worldCount" class="text-xs text-gray-600"></div>
         </div>
         <div id="worldContainer"></div>
     </div>
 
     <script>
-        function toggleSettings() {
-            var panel = document.getElementById('settingsPanel');
-            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
-        }
-
-        async function loadModels() {
-            var rawUrl = document.getElementById('apiUrl').value.trim();
-            if (!rawUrl) return alert('请先填写 API URL');
-            
-            var baseUrl = rawUrl.replace(/\/\(/, '').replace(/\/chat\/completions\)/, '');
-            var key = document.getElementById('apiKey').value.trim();
-            var btn = document.getElementById('loadBtn');
-            var sel = document.getElementById('modelSelect');
-
-            btn.disabled = true; btn.innerText = '连接中...';
-            
-            try {
-                var res = await fetch(baseUrl + '/models', { 
-                    method: 'GET', headers: { 'Authorization': 'Bearer ' + key } 
-                });
-
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                var data = await res.json();
-                var list = Array.isArray(data) ? data : (data.data || []);
-                
-                sel.innerHTML = '';
-                if (list.length === 0) throw new Error('列表为空');
-
-                list.sort(function(a,b) {
-                    var idA = (a.id||a).toLowerCase();
-                    return idA.indexOf('gpt') !== -1 ? -1 : 1;
-                });
-
-                list.forEach(function(m) {
-                    var id = m.id || m;
-                    var opt = document.createElement('option');
-                    opt.value = id; opt.innerText = id;
-                    sel.appendChild(opt);
-                });
-                
-                sel.disabled = false;
-                alert('连接成功');
-            } catch(e) {
-                alert('连接失败: ' + e.message);
-            } finally {
-                btn.disabled = false; btn.innerText = '连接服务器';
-            }
-        }
-
-        var isProcessing = false;
-        var shouldStop = false;
-
-        function stopAiConvert() {
-            if (isProcessing) {
-                shouldStop = true;
-                document.getElementById('statusText').innerText = "正在停止...";
-            }
-        }
-
-        // ================= 分块处理核心逻辑 =================
-        async function startAiConvert(gender) {
-            if (isProcessing) return;
-            var blocks = document.querySelectorAll('.text-content');
-            if (blocks.length === 0) return alert('请先上传文件');
-
-            var model = document.getElementById('modelSelect').value;
-            if (document.getElementById('modelSelect').disabled || !model) return alert('请先连接API');
-
-            var confirmMsg = gender === 'male' ? '转为男性 (BL/BG)' : '转为女性 (BG/GL)';
-            if (!confirm('确认' + confirmMsg + '？\n将采用分块处理模式，请耐心等待进度条走完。')) return;
-
-            isProcessing = true;
-            shouldStop = false;
-            document.getElementById('aiStatus').classList.remove('hidden');
-            document.getElementById('progressBarContainer').style.display = 'block';
-            document.getElementById('progressBar').style.width = '0%';
-            
-            var target = gender === 'male' ? '男性' : '女性';
-            var avoid = gender === 'male' ? '她' : '他';
-            var want = gender === 'male' ? '他' : '她';
-
-            // 分块 Prompt：专门处理短文本，指令超强
-            var prompt = 
-                "你是一个文本片段重写工具。任务：\n" +
-                "1. 将片段中指代User的词汇改为【" + target + "】，代词【" + avoid + "】改为【" + want + "】。\n" +
-                "2. 【NSFW/生理重构】：根据" + target + "的生理结构修改器官和动作描写（如将女性特征改为男性特征）。\n" +
-                "3. 【格式死命令】：\n" +
-                "   - 这是一个文本切片，**严禁合并行**！\n" +
-                "   - **严禁删除空行**！\n" +
-                "   - 保持 XML 标签（如 <tag>）原样不动。\n" +
-                "   - 直接输出修改后的文本，不要加 ``` 代码块标记。";
-
-            var totalBlocks = blocks.length;
-            
-            for (var i = 0; i < blocks.length; i++) {
-                if (shouldStop) { alert('已停止'); break; }
-
-                var block = blocks[i];
-                var fullText = block.textContent;
-                if (!fullText || !fullText.trim()) continue;
-
-                block.parentElement.style.opacity = '0.6';
-                
-                // === 切分逻辑 ===
-                // 按换行符切分
-                var lines = fullText.split('\n');
-                var chunks = [];
-                var chunkSize = 15; // 每 15 行一个块，这个大小 AI 处理最稳
-                
-                for (var j = 0; j < lines.length; j += chunkSize) {
-                    chunks.push(lines.slice(j, j + chunkSize).join('\n'));
-                }
-
-                var processedChunks = [];
-                
-                // === 逐块处理 ===
-                for (var k = 0; k < chunks.length; k++) {
-                    if (shouldStop) break;
-                    
-                    var chunk = chunks[k];
-                    // 如果这块全是空行或者太短，直接跳过不发给 AI，省钱又省事
-                    if (!chunk.trim()) {
-                        processedChunks.push(chunk);
-                        continue;
-                    }
-
-                    document.getElementById('statusText').innerText = 
-                        "卡片 " + (i + 1) + "/" + totalBlocks + " - 进度 " + Math.round((k + 1) / chunks.length * 100) + "%";
-
-                    try {
-                        var newChunk = await callAi(chunk, prompt, model);
-                        if (newChunk) {
-                            processedChunks.push(newChunk);
-                        } else {
-                            processedChunks.push(chunk); // 失败兜底
-                        }
-                    } catch (e) {
-                        console.error(e);
-                        processedChunks.push(chunk); // 报错兜底
-                        block.style.border = "1px solid red";
-                    }
-                }
-
-                if (shouldStop) { block.parentElement.style.opacity = '1'; alert('已停止'); break; }
-
-                // === 拼装回填 ===
-                var finalText = processedChunks.join('\n');
-                
-                // 最终兜底修复：防止 AI 在最后一块把标签粘连了
-                finalText = finalText.replace(/>\s*</g, ">\n<");
-
-                if (finalText !== fullText) {
-                    block.textContent = finalText;
-                    block.classList.add('highlight-change');
-                    (function(el) {
-                        setTimeout(function() { el.classList.remove('highlight-change'); }, 1500);
-                    })(block);
-                }
-                
-                block.parentElement.style.opacity = '1';
-                
-                // 更新总进度条
-                document.getElementById('progressBar').style.width = ((i + 1) / totalBlocks * 100) + "%";
-            }
-
-            isProcessing = false;
-            document.getElementById('aiStatus').classList.add('hidden');
-            document.getElementById('progressBarContainer').style.display = 'none';
-            if (!shouldStop) alert('处理完成');
-            shouldStop = false;
-        }
-
-        async function callAi(text, sys, model) {
-            var rawUrl = document.getElementById('apiUrl').value.trim();
-            var baseUrl = rawUrl.replace(/\/\(/, '').replace(/\/chat\/completions\)/, '');
-            var url = baseUrl + '/chat/completions';
-            var key = document.getElementById('apiKey').value;
-
-            var res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
-                body: JSON.stringify({
-                    model: model,
-                    messages: [{role:'system',content:sys},{role:'user',content:text}],
-                    temperature: 0.1,
-                    max_tokens: 4000
-                })
+        // 复制提示词
+        function copyPrompt() {
+            const text = document.getElementById('promptText').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('.btn-blue');
+                const oldText = btn.innerText;
+                btn.innerText = '✅ 已复制，去发给AI吧';
+                btn.style.backgroundColor = '#10b981';
+                setTimeout(() => {
+                    btn.innerText = oldText;
+                    btn.style.backgroundColor = '#2563eb';
+                }, 2000);
             });
-
-            if (!res.ok) {
-                var errTxt = await res.text();
-                throw new Error('API Error: ' + res.status);
-            }
-
-            var json = await res.json();
-            if (json.choices && json.choices.length > 0) {
-                var content = json.choices[0].message.content;
-                content = content.replace(/^```.*\n/g, '').replace(/\n```$/g, '');
-                return content;
-            }
-            return text;
         }
 
-        function applyManualReplace() {
-            var f = document.getElementById('findText').value;
-            var r = document.getElementById('replaceText').value;
-            if (!f) return alert('请输入查找内容');
-            
-            var blocks = document.querySelectorAll('.text-content');
-            var n = 0;
-            
-            for (var i = 0; i < blocks.length; i++) {
-                var el = blocks[i];
-                if (el.textContent.indexOf(f) !== -1) {
-                    el.textContent = el.textContent.split(f).join(r);
-                    el.classList.add('highlight-change');
-                    (function(elem) {
-                        setTimeout(function() { elem.classList.remove('highlight-change'); }, 1500);
-                    })(el);
-                    n++;
-                }
-            }
-            alert('已替换 ' + n + ' 处');
-        }
-
+        // 文件处理逻辑 (保持原样)
         function handleFile(file) {
             if (!file) return;
-            var reader = new FileReader();
+            const reader = new FileReader();
             reader.onload = function(e) {
-                var d = e.target.result;
-                if (file.name.toLowerCase().indexOf('.png') !== -1) {
-                    var txt = extractPng(new Uint8Array(d));
+                const d = e.target.result;
+                if (file.name.toLowerCase().endsWith('.png')) {
+                    const txt = extractPng(new Uint8Array(d));
                     if (!txt) return alert('无效 PNG');
                     parseData(txt);
                 } else {
                     parseData(d);
                 }
             };
-            if (file.name.toLowerCase().indexOf('.png') !== -1) {
+            if (file.name.toLowerCase().endsWith('.png')) {
                 reader.readAsArrayBuffer(file);
             } else {
                 reader.readAsText(file);
@@ -369,45 +146,46 @@
 
         function parseData(str) {
             try {
-                var d;
+                let d;
                 try { d = JSON.parse(str); } 
                 catch (e) { 
-                    var b = atob(str); 
-                    var arr = new Uint8Array(b.length);
-                    for(var i=0; i<b.length; i++) arr[i] = b.charCodeAt(i);
+                    const b = atob(str); 
+                    const arr = new Uint8Array(b.length);
+                    for(let i=0; i<b.length; i++) arr[i] = b.charCodeAt(i);
                     d = JSON.parse(new TextDecoder('utf-8').decode(arr));
                 }
                 
-                var data = d.data || d;
+                const data = d.data || d;
                 document.getElementById('dropZone').classList.add('hidden');
                 document.getElementById('contentArea').classList.remove('hidden');
                 
-                var cBox = document.getElementById('charContainer'); cBox.innerHTML = '';
-                var wBox = document.getElementById('worldContainer'); wBox.innerHTML = '';
+                const cBox = document.getElementById('charContainer'); cBox.innerHTML = '';
+                const wBox = document.getElementById('worldContainer'); wBox.innerHTML = '';
 
-                var map = [['description','描述'], ['first_mes','开场白'], ['personality','性格'], ['scenario','场景'], ['mes_example','示例'], ['system_prompt','系统提示'], ['post_history_instructions','后指令']];
+                // 基础字段
+                const map = [['description','描述'], ['first_mes','开场白'], ['personality','性格'], ['scenario','场景'], ['mes_example','示例'], ['system_prompt','系统提示'], ['post_history_instructions','后指令']];
                 
-                map.forEach(function(item) {
-                    var k = item[0]; var l = item[1];
-                    if (data[k]) addCard(cBox, l, data[k]);
+                map.forEach(item => {
+                    if (data[item[0]]) addCard(cBox, item[1], data[item[0]]);
                 });
 
                 if (data.alternate_greetings) {
-                    data.alternate_greetings.forEach(function(v,i) { addCard(cBox, '备用 #'+(i+1), v); });
+                    data.alternate_greetings.forEach((v,i) => addCard(cBox, '备用 #'+(i+1), v));
                 }
                 if (data.group_only_greetings) {
-                    data.group_only_greetings.forEach(function(v,i) { addCard(cBox, '群聊 #'+(i+1), v); });
+                    data.group_only_greetings.forEach((v,i) => addCard(cBox, '群聊 #'+(i+1), v));
                 }
 
-                var books = [];
+                // 世界书
+                let books = [];
                 if (data.character_book && data.character_book.entries) books = data.character_book.entries;
                 else if (d.character_book && d.character_book.entries) books = d.character_book.entries;
 
                 document.getElementById('worldCount').innerText = books.length + ' 条目';
                 
-                books.forEach(function(e,i) {
+                books.forEach((e,i) => {
                     if (!e.content) return;
-                    var t = e.comment || (e.keys ? 'Keys: '+e.keys.join(', ') : '#'+(i+1));
+                    const t = e.comment || (e.keys ? 'Keys: '+e.keys.join(', ') : '#'+(i+1));
                     addCard(wBox, t, e.content);
                 });
 
@@ -415,20 +193,19 @@
         }
 
         function addCard(box, title, text) {
-            var div = document.createElement('div'); div.className = 'card';
+            const div = document.createElement('div'); div.className = 'card';
             
-            var header = document.createElement('div'); header.className = 'card-header';
-            var span = document.createElement('span'); span.innerText = title;
-            var btn = document.createElement('button'); 
-            btn.className = 'btn btn-blue'; 
-            btn.style.width = 'auto'; btn.style.padding = '4px 8px'; btn.style.fontSize = '12px'; btn.style.marginBottom = '0';
+            const header = document.createElement('div'); header.className = 'card-header';
+            const span = document.createElement('span'); span.className = 'truncate mr-2'; span.innerText = title;
+            const btn = document.createElement('button'); 
+            btn.className = 'btn btn-copy-sm'; 
             btn.innerText = '复制';
             btn.onclick = function() { copy(this); };
 
             header.appendChild(span); header.appendChild(btn);
 
-            var body = document.createElement('div'); body.className = 'card-body';
-            var txtDiv = document.createElement('div'); txtDiv.className = 'text-content';
+            const body = document.createElement('div'); body.className = 'card-body';
+            const txtDiv = document.createElement('div'); txtDiv.className = 'text-content';
             txtDiv.innerText = text;
 
             body.appendChild(txtDiv);
@@ -437,25 +214,25 @@
         }
 
         function copy(btn) {
-            var txt = btn.parentElement.nextElementSibling.innerText;
-            navigator.clipboard.writeText(txt).then(function() {
-                var old = btn.innerText; btn.innerText = 'OK';
-                setTimeout(function(){ btn.innerText=old; }, 1000);
+            const txt = btn.parentElement.nextElementSibling.innerText;
+            navigator.clipboard.writeText(txt).then(() => {
+                const old = btn.innerText; btn.innerText = 'OK';
+                setTimeout(() => btn.innerText = old, 1000);
             });
         }
 
         function extractPng(buf) {
-            var view = new DataView(buf.buffer); var p=8; var dec = new TextDecoder('utf-8');
+            const view = new DataView(buf.buffer); let p=8; const dec = new TextDecoder('utf-8');
             while(p < buf.length) {
-                var len = view.getUint32(p); 
-                var type = dec.decode(buf.slice(p+4, p+8));
+                const len = view.getUint32(p); 
+                const type = dec.decode(buf.slice(p+4, p+8));
                 if(type === 'tEXt' || type === 'iTXt') {
-                    var d = buf.slice(p+8, p+8+len); 
-                    var split = d.indexOf(0);
+                    const d = buf.slice(p+8, p+8+len); 
+                    const split = d.indexOf(0);
                     if(dec.decode(d.slice(0, split)) === 'chara') {
                         if (type === 'tEXt') return dec.decode(d.slice(split+1));
                         else {
-                            var p2 = split + 3;
+                            let p2 = split + 3;
                             while (p2 < d.length && d[p2] !== 0) p2++; p2++;
                             while (p2 < d.length && d[p2] !== 0) p2++; p2++;
                             return dec.decode(d.slice(p2));
