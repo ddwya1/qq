@@ -3,590 +3,405 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SillyTavern 角色卡性别转换 (强力修正版)</title>
+    <title>角色卡重构台 (兼容修复版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        * { -webkit-tap-highlight-color: transparent; }
-        :root { --glass-bg: rgba(10, 10, 15, 0.98); --glass-border: rgba(255, 255, 255, 0.08); --accent: #3b82f6; }
-        body { background: #020202; color: #e4e4e7; min-height: 100vh; font-family: sans-serif; }
-        .glass { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 12px; }
-        .glass-input, .glass-select { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; transition: 0.2s; }
-        .glass-input:focus { border-color: var(--accent); outline: none; }
-        .btn-primary { background: var(--accent); color: white; border-radius: 8px; font-weight: bold; transition: 0.2s; }
-        .btn-primary:hover:not(:disabled) { filter: brightness(1.2); box-shadow: 0 0 15px rgba(59, 130, 246, 0.3); }
-        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
-        .progress-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
-        .progress-fill { height: 100%; background: var(--accent); transition: width 0.2s; }
-        .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; color: white; z-index: 9999; animation: slideIn 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
-        .toast.success { background: #10b981; } .toast.error { background: #ef4444; } .toast.info { background: #3b82f6; }
-        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-        .status-dot.pending { background: #52525b; } .status-dot.processing { background: #3b82f6; animation: pulse 1s infinite; }
-        .status-dot.done { background: #10b981; } .status-dot.error { background: #ef4444; }
-        @keyframes pulse { 50% { opacity: 0.5; } }
-        .hidden { display: none; }
-        .tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.1); color: #aaa; margin-left: 6px; }
+        /* 基础设置 */
+        body { background-color: #09090b; color: #e4e4e7; font-family: sans-serif; padding-bottom: 40px; }
+        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        .hidden { display: none !important; }
+
+        /* 顶部导航 */
+        .navbar {
+            position: sticky; top: 0; z-index: 50;
+            background: rgba(24, 24, 27, 0.95); backdrop-filter: blur(12px);
+            border-bottom: 1px solid #27272a;
+            padding: 12px 16px;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .nav-title { font-weight: 800; font-size: 1.1rem; color: #60a5fa; }
+        
+        /* 设置面板 */
+        #settingsPanel { background: #18181b; border-bottom: 1px solid #27272a; padding: 16px; display: none; }
+
+        /* 输入框与按钮 */
+        .input-dark {
+            background: #27272a; border: 1px solid #3f3f46; color: white;
+            padding: 10px; border-radius: 8px; width: 100%; font-size: 14px; margin-bottom: 8px;
+        }
+        .btn {
+            display: flex; justify-content: center; align-items: center;
+            padding: 10px; border-radius: 8px; font-weight: 600; font-size: 14px;
+            border: none; width: 100%; margin-bottom: 5px;
+        }
+        .btn-blue { background: #2563eb; color: white; }
+        .btn-red { background: #dc2626; color: white; }
+        .btn-gray { background: #3f3f46; color: white; }
+        
+        /* 卡片样式 */
+        .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+        .card-header { background: #27272a; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #a1a1aa; display: flex; justify-content: space-between; }
+        .text-content {
+            background: #09090b; color: #d4d4d8; padding: 14px; 
+            font-family: monospace; font-size: 13px; line-height: 1.5;
+            white-space: pre-wrap; word-break: break-all; border-top: 1px solid #27272a;
+        }
+        
+        /* 状态动画 */
+        .highlight-change { animation: flash 1.5s; }
+        @keyframes flash { 0% { background: rgba(16, 185, 129, 0.2); } 100% { background: #09090b; } }
+        .processing { opacity: 0.6; border-left: 3px solid #f59e0b; }
+        .upload-box { border: 2px dashed #3f3f46; border-radius: 12px; padding: 40px 20px; text-align: center; color: #71717a; margin: 16px; }
     </style>
+    <script>
+        // 全局错误捕捉：如果代码报错，直接弹窗
+        window.onerror = function(msg, url, line) {
+            alert("系统错误:\n" + msg + "\n行号: " + line);
+            return false;
+        };
+    </script>
 </head>
-<body class="p-4 pb-20 max-w-2xl mx-auto">
-    <div class="text-center mb-6">
-        <h1 class="text-2xl font-bold text-blue-400">🔍 全域角色卡重构工具</h1>
-        <p class="text-xs text-gray-500 mt-1">强力修正模式 · 专治改不动</p>
+<body>
+
+    <div class="navbar">
+        <div class="nav-title">🧬 角色重构台</div>
+        <button onclick="toggleSettings()" style="font-size:20px; background:none; border:none;">⚙️</button>
     </div>
 
-    <!-- API 设置 -->
-    <div class="glass p-4 mb-4">
-        <h2 class="font-bold mb-3 text-sm text-gray-300">⚙️ API 连接</h2>
-        <div class="space-y-3">
-            <input type="text" id="apiUrl" class="glass-input w-full p-2 text-sm" placeholder="API URL (例如 https://api.openai.com/v1)" onchange="clearModelList()">
-            <input type="password" id="apiKey" class="glass-input w-full p-2 text-sm" placeholder="API Key (sk-...)" onchange="clearModelList()">
+    <div id="settingsPanel">
+        <input type="text" id="apiUrl" class="input-dark" placeholder="API URL">
+        <input type="password" id="apiKey" class="input-dark" placeholder="API Key">
+        <div class="flex gap-2">
+            <button onclick="loadModels()" id="loadBtn" class="btn btn-blue">连接服务器</button>
+            <select id="modelSelect" class="input-dark" disabled><option>请先连接</option></select>
+        </div>
+    </div>
+
+    <div class="p-4 flex flex-col gap-3">
+        <div class="bg-[#18181b] p-3 rounded-xl border border-[#27272a]">
+            <div class="flex justify-between mb-2">
+                <span class="text-xs font-bold text-blue-400">AI 智能改写</span>
+                <span id="aiStatus" class="text-xs text-yellow-500 hidden">处理中...</span>
+            </div>
             <div class="flex gap-2">
-                <select id="modelSelect" class="glass-select flex-1 p-2 text-sm" disabled><option>请先加载模型</option></select>
-                <button onclick="loadModels()" id="loadBtn" class="glass-input px-4 text-sm hover:bg-white/5">🔄 加载</button>
+                <button onclick="startAiConvert('male')" class="btn btn-blue">♂ 转男</button>
+                <button onclick="startAiConvert('female')" class="btn btn-red">♀ 转女</button>
             </div>
         </div>
-    </div>
 
-    <!-- 目标性别 -->
-    <div class="glass p-4 mb-4">
-        <div class="flex gap-2">
-            <button id="btn-male" class="flex-1 p-3 rounded-lg border border-transparent bg-white/5 text-gray-400 transition" onclick="setGender('male')">转为男性 User ♂️</button>
-            <button id="btn-female" class="flex-1 p-3 rounded-lg border border-transparent bg-white/5 text-gray-400 transition" onclick="setGender('female')">转为女性 User ♀️</button>
+        <div class="bg-[#18181b] p-3 rounded-xl border border-[#27272a]">
+            <div class="text-xs font-bold text-gray-500 mb-2">手动替换</div>
+            <div class="flex gap-2">
+                <input type="text" id="findText" class="input-dark" placeholder="查找">
+                <input type="text" id="replaceText" class="input-dark" placeholder="替换">
+            </div>
+            <button onclick="applyManualReplace()" class="btn btn-gray">执行替换</button>
         </div>
     </div>
 
-    <!-- 文件操作 -->
-    <div class="glass p-4 mb-4 text-center border-dashed border-2 border-white/10 hover:border-blue-500/50 transition cursor-pointer" onclick="document.getElementById('fileInput').click()" id="dropZone">
+    <div id="dropZone" class="upload-box" onclick="document.getElementById('fileInput').click()">
         <input type="file" id="fileInput" class="hidden" accept=".png,.json" onchange="handleFile(this.files[0])">
-        <div id="fileInfo" class="py-4">
-            <div class="text-2xl mb-2">📂</div>
-            <div class="text-sm text-gray-400">点击上传 PNG / JSON</div>
+        <div class="text-4xl mb-2">📂</div>
+        <div class="text-sm">点击上传角色卡</div>
+    </div>
+
+    <div id="contentArea" class="hidden px-4 pb-10">
+        <div class="text-xs font-bold text-gray-500 mb-2 mt-4 uppercase">基础信息</div>
+        <div id="charContainer"></div>
+        <div class="flex justify-between items-end mb-2 mt-6">
+            <div class="text-xs font-bold text-gray-500 uppercase">世界书</div>
+            <div id="worldCount" class="text-xs text-gray-600"></div>
         </div>
-    </div>
-
-    <!-- 扫描报告 -->
-    <div id="scanReport" class="glass p-3 mb-4 hidden bg-blue-500/10 border-blue-500/30">
-        <div class="text-sm font-bold text-blue-300">📊 扫描报告</div>
-        <div id="scanDetails" class="text-xs text-gray-400 mt-1"></div>
-    </div>
-
-    <!-- 控制台 -->
-    <div id="controlPanel" class="hidden grid grid-cols-2 gap-3 mb-4">
-        <button id="pauseBtn" class="glass-input p-3 font-bold" onclick="togglePause()">⏸️ 暂停</button>
-        <button id="retryBtn" class="glass-input p-3 font-bold text-red-400 hidden" onclick="retryFailed()">🔄 重试失败项</button>
-    </div>
-
-    <button id="startBtn" class="btn-primary w-full p-4 mb-4 text-lg hidden" onclick="start()">🚀 开始全域转换</button>
-
-    <!-- 进度 -->
-    <div id="progressArea" class="glass p-4 mb-4 hidden">
-        <div class="flex justify-between text-xs mb-2">
-            <span id="statusText">准备中...</span>
-            <span id="progressText">0/0</span>
-        </div>
-        <div class="progress-bar mb-3"><div id="bar" class="progress-fill" style="width:0%"></div></div>
-        <div id="log" class="text-xs font-mono text-gray-400 max-h-60 overflow-y-auto space-y-1 pr-1"></div>
-    </div>
-
-    <!-- 导出 -->
-    <div id="exportArea" class="glass p-4 hidden">
-        <h3 class="font-bold mb-3">💾 导出结果</h3>
-        <div class="grid grid-cols-2 gap-3">
-            <button class="btn-primary p-3" onclick="exportFile('png')">下载 PNG</button>
-            <button class="glass-input p-3" onclick="exportFile('json')">下载 JSON</button>
-        </div>
-        <div id="diffBox" class="mt-4 text-xs bg-black/30 p-2 rounded max-h-60 overflow-y-auto whitespace-pre-wrap font-mono text-gray-400"></div>
+        <div id="worldContainer"></div>
     </div>
 
     <script>
-        const state = {
-            gender: 'male',
-            orig: null,
-            conv: null,
-            pngBuf: null,
-            fname: '',
-            tasks: [],
-            active: 0,
-            done: 0,
-            total: 0,
-            paused: false
-        };
-
-        // --- 深度扫描引擎 ---
-        function deepScan(data) {
-            const tasks = [];
-            const d = data.data || data; // 兼容 wrap
-
-            // 1. 基础字段
-            const coreFields = [
-                'description', 'first_mes', 'scenario', 'mes_example', 
-                'personality', 'system_prompt', 'post_history_instructions', 
-                'depth_prompt', 'room_prototype_id'
-            ];
-            
-            coreFields.forEach(k => {
-                if (d[k] && typeof d[k] === 'string' && d[k].trim()) {
-                    tasks.push({ path: [k], name: mapName(k), val: d[k], status: 'pending' });
-                }
-            });
-
-            // 2. 数组字段
-            if (Array.isArray(d.alternate_greetings)) {
-                d.alternate_greetings.forEach((v, i) => {
-                    if (v && v.trim()) tasks.push({ path: ['alternate_greetings', i], name: `备用问候 ${i+1}`, val: v, status: 'pending' });
-                });
-            }
-            if (Array.isArray(d.group_only_greetings)) {
-                d.group_only_greetings.forEach((v, i) => {
-                    if (v && v.trim()) tasks.push({ path: ['group_only_greetings', i], name: `群聊问候 ${i+1}`, val: v, status: 'pending' });
-                });
-            }
-
-            // 3. 世界书
-            const book = d.character_book || d.lorebook;
-            if (book && book.entries && Array.isArray(book.entries)) {
-                book.entries.forEach((entry, i) => {
-                    if (entry.content && entry.content.trim()) {
-                        const keys = entry.keys ? entry.keys.join(', ').substring(0, 15) : i;
-                        tasks.push({ 
-                            path: ['character_book', 'entries', i, 'content'], 
-                            name: `世界书 [${keys}...]`, 
-                            val: entry.content, 
-                            status: 'pending' 
-                        });
-                    }
-                });
-            }
-
-            return tasks;
+        function toggleSettings() {
+            var panel = document.getElementById('settingsPanel');
+            panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
         }
 
-        function mapName(key) {
-            const map = {
-                'description': '角色描述', 'first_mes': '首条消息', 'scenario': '场景设定',
-                'mes_example': '对话示例', 'personality': '性格特征', 'system_prompt': '系统提示词',
-                'post_history_instructions': '历史后指令', 'depth_prompt': '深度提示词'
-            };
-            return map[key] || key;
-        }
-
-        // --- 基础逻辑 ---
-        function setGender(g) {
-            state.gender = g;
-            document.getElementById('btn-male').className = `flex-1 p-3 rounded-lg border ${g==='male'?'border-blue-500 bg-blue-500/10 text-white':'bg-white/5 text-gray-400'}`;
-            document.getElementById('btn-female').className = `flex-1 p-3 rounded-lg border ${g==='female'?'border-blue-500 bg-blue-500/10 text-white':'bg-white/5 text-gray-400'}`;
-        }
-        setGender('male');
-
-        function toast(msg, type='info') {
-            const t = document.createElement('div'); t.className = `toast ${type}`; t.innerText = msg;
-            document.body.appendChild(t); setTimeout(() => t.remove(), 3000);
-        }
-
-        // --- API ---
+        // ================= API 逻辑 =================
         async function loadModels() {
-            let rawUrl = document.getElementById('apiUrl').value.trim();
-            // 去除末尾斜杠和 /chat/completions 以获得 Base URL
-            rawUrl = rawUrl.replace(/\/\(/, '').replace(/\/chat\/completions\)/, '');
+            var rawUrl = document.getElementById('apiUrl').value.trim();
+            if (!rawUrl) return alert('请先填写 API URL');
             
-            const key = document.getElementById('apiKey').value.trim();
-            const btn = document.getElementById('loadBtn');
-            const sel = document.getElementById('modelSelect');
+            var baseUrl = rawUrl.replace(/\/\(/, '').replace(/\/chat\/completions\)/, '');
+            var key = document.getElementById('apiKey').value.trim();
+            var btn = document.getElementById('loadBtn');
+            var sel = document.getElementById('modelSelect');
 
-            if(!rawUrl || !key) return toast('请填写 URL 和 Key', 'error');
-            
-            btn.disabled = true; 
-            btn.innerText = '连接中...';
+            btn.disabled = true; btn.innerText = '连接中...';
             
             try {
-                // 尝试请求 /models
-                const res = await fetch(`${rawUrl}/models`, { 
-                    method: 'GET',
-                    headers: { 'Authorization': `Bearer ${key}` } 
+                var res = await fetch(baseUrl + '/models', { 
+                    method: 'GET', headers: { 'Authorization': 'Bearer ' + key } 
                 });
-                
-                if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                
-                const data = await res.json();
-                const list = Array.isArray(data) ? data : (data.data || []);
+
+                if (!res.ok) throw new Error('HTTP ' + res.status);
+                var data = await res.json();
+                var list = Array.isArray(data) ? data : (data.data || []);
                 
                 sel.innerHTML = '';
-                if (list.length === 0) throw new Error('模型列表为空');
+                if (list.length === 0) throw new Error('列表为空');
 
-                // 排序：chat/gpt 优先
-                list.sort((a,b) => {
-                    const idA = (a.id||a).toLowerCase(), idB = (b.id||b).toLowerCase();
-                    return (idA.includes('gpt') || idA.includes('chat')) ? -1 : 1;
+                list.sort(function(a,b) {
+                    var idA = (a.id||a).toLowerCase();
+                    return idA.indexOf('gpt') !== -1 ? -1 : 1;
                 });
 
-                list.forEach(m => {
-                    const id = m.id || m;
-                    const opt = document.createElement('option'); opt.value = id; opt.innerText = id; sel.appendChild(opt);
+                list.forEach(function(m) {
+                    var id = m.id || m;
+                    var opt = document.createElement('option');
+                    opt.value = id; opt.innerText = id;
+                    sel.appendChild(opt);
                 });
                 
                 sel.disabled = false;
-                toast(`加载成功: ${list.length} 个模型`, 'success');
-                checkStart();
-
-            } catch(e) { 
-                console.error(e);
-                // 失败兜底：手动输入
-                sel.innerHTML = `
-                    <option value="" disabled>-- 加载失败，请手动输入 --</option>
-                    <option value="gpt-3.5-turbo">gpt-3.5-turbo</option>
-                    <option value="gpt-4o">gpt-4o</option>
-                    <option value="claude-3-5-sonnet-20240620">claude-3-5-sonnet</option>
-                `;
-                const manual = prompt(`无法获取模型列表 (${e.message})。\n请手动输入模型名称：`, "gpt-3.5-turbo");
-                if(manual) {
-                    const opt = document.createElement('option');
-                    opt.value = manual; opt.innerText = manual + " (手动)"; opt.selected = true;
-                    sel.insertBefore(opt, sel.firstChild);
-                }
-                sel.disabled = false;
-                checkStart();
-                toast('已切换至手动模式', 'info');
-            } finally { 
-                btn.disabled = false; btn.innerText = '🔄 加载'; 
+                alert('连接成功');
+            } catch(e) {
+                alert('连接失败: ' + e.message);
+            } finally {
+                btn.disabled = false; btn.innerText = '连接服务器';
             }
         }
 
-        function clearModelList() {
-            document.getElementById('modelSelect').innerHTML = '<option>请重新加载</option>';
-            document.getElementById('modelSelect').disabled = true;
-            checkStart();
-        }
+        // ================= AI 逻辑 (兼容版) =================
+        var isProcessing = false;
 
-        // --- 文件 ---
-        const dropZone = document.getElementById('dropZone');
-        dropZone.ondragover = e => { e.preventDefault(); dropZone.style.borderColor = '#3b82f6'; };
-        dropZone.ondragleave = e => { e.preventDefault(); dropZone.style.borderColor = ''; };
-        dropZone.ondrop = e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); };
+        async function startAiConvert(gender) {
+            // 调试检查
+            if (isProcessing) return;
+            var blocks = document.querySelectorAll('.text-content');
+            if (blocks.length === 0) return alert('请先上传文件，页面没有内容！');
 
-        function handleFile(f) {
-            if (!f) return;
-            state.fname = f.name.replace(/\.(png|json)$/i, '');
-            const reader = new FileReader();
-            if (f.name.endsWith('.json')) {
-                reader.onload = e => parseData(e.target.result);
-                reader.readAsText(f);
-            } else {
-                reader.onload = e => {
-                    state.pngBuf = new Uint8Array(e.target.result);
-                    const txt = extractPngText(state.pngBuf);
-                    if (txt) parseData(txt); else toast('无效 PNG', 'error');
-                };
-                reader.readAsArrayBuffer(f);
-            }
-        }
+            var model = document.getElementById('modelSelect').value;
+            if (document.getElementById('modelSelect').disabled || !model) return alert('请先连接API并选择模型');
 
-        function extractPngText(buf) {
-            const view = new DataView(buf.buffer);
-            let p = 8;
-            while (p < buf.length) {
-                const len = view.getUint32(p);
-                const type = new TextDecoder().decode(buf.slice(p+4, p+8));
-                if (type === 'tEXt' || type === 'iTXt') {
-                    const data = buf.slice(p+8, p+8+len);
-                    let split = data.indexOf(0);
-                    const key = new TextDecoder().decode(data.slice(0, split));
-                    if (key === 'chara') {
-                        let txt = data.slice(split + (type==='tEXt'?1:2));
-                        if(type === 'iTXt') { let i=0; while(txt[i++]!==0); while(txt[i++]!==0); txt=txt.slice(i); }
-                        return new TextDecoder('utf-8').decode(txt);
+            var confirmMsg = gender === 'male' ? '转为男性' : '转为女性';
+            if (!confirm('确认' + confirmMsg + '？')) return;
+
+            isProcessing = true;
+            document.getElementById('aiStatus').classList.remove('hidden');
+            
+            var target = gender === 'male' ? '男性' : '女性';
+            var avoid = gender === 'male' ? '她' : '他';
+            var want = gender === 'male' ? '他' : '她';
+
+            var prompt = "你是一个文本重写工具。任务：\n1. 将文中指代【用户/User】的性别改为【" + target + "】。\n2. 必须将代词“" + avoid + "”改为“" + want + "”。\n3. 必须修改生理特征（如胸部/生殖器）以匹配" + target + "。\n4. 遇到色情描写，必须根据解剖学逻辑修改。\n5. 严禁修改剧情和格式，严禁解释。直接输出结果。";
+
+            var count = 0;
+            for (var i = 0; i < blocks.length; i++) {
+                var block = blocks[i];
+                var txt = block.textContent;
+                if (!txt || !txt.trim()) continue;
+
+                count++;
+                document.getElementById('aiStatus').innerText = "处理中 " + count + "/" + blocks.length;
+                block.parentElement.style.opacity = '0.5';
+
+                try {
+                    var newTxt = await callAi(txt, prompt, model);
+                    if (newTxt && newTxt !== txt) {
+                        block.textContent = newTxt;
+                        block.classList.add('highlight-change');
+                        // 使用闭包解决 setTimeout 引用问题
+                        (function(el) {
+                            setTimeout(function() { el.classList.remove('highlight-change'); }, 1500);
+                        })(block);
                     }
+                } catch (e) {
+                    console.error(e);
+                    block.style.border = "1px solid red";
                 }
-                p += 12 + len;
+                block.parentElement.style.opacity = '1';
             }
-            return null;
+
+            isProcessing = false;
+            document.getElementById('aiStatus').classList.add('hidden');
+            alert('处理完成');
+        }
+
+        async function callAi(text, sys, model) {
+            var rawUrl = document.getElementById('apiUrl').value.trim();
+            var baseUrl = rawUrl.replace(/\/\(/, '').replace(/\/chat\/completions\)/, '');
+            var url = baseUrl + '/chat/completions';
+            var key = document.getElementById('apiKey').value;
+
+            var res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [{role:'system',content:sys},{role:'user',content:text}],
+                    temperature: 0.1,
+                    max_tokens: 4000
+                })
+            });
+
+            if (!res.ok) {
+                var errTxt = await res.text();
+                throw new Error('API Error: ' + res.status);
+            }
+
+            var json = await res.json();
+            if (json.choices && json.choices.length > 0) {
+                return json.choices[0].message.content.trim();
+            }
+            return text;
+        }
+
+        // ================= 手动替换 =================
+        function applyManualReplace() {
+            var f = document.getElementById('findText').value;
+            var r = document.getElementById('replaceText').value;
+            if (!f) return alert('请输入查找内容');
+            
+            var blocks = document.querySelectorAll('.text-content');
+            var n = 0;
+            
+            for (var i = 0; i < blocks.length; i++) {
+                var el = blocks[i];
+                if (el.textContent.indexOf(f) !== -1) {
+                    el.textContent = el.textContent.split(f).join(r);
+                    el.classList.add('highlight-change');
+                    (function(elem) {
+                        setTimeout(function() { elem.classList.remove('highlight-change'); }, 1500);
+                    })(el);
+                    n++;
+                }
+            }
+            alert('已替换 ' + n + ' 处');
+        }
+
+        // ================= 文件解析 (兼容版) =================
+        function handleFile(file) {
+            if (!file) return;
+            var reader = new FileReader();
+            reader.onload = function(e) {
+                var d = e.target.result;
+                if (file.name.toLowerCase().indexOf('.png') !== -1) {
+                    var txt = extractPng(new Uint8Array(d));
+                    if (!txt) return alert('无效 PNG');
+                    parseData(txt);
+                } else {
+                    parseData(d);
+                }
+            };
+            if (file.name.toLowerCase().indexOf('.png') !== -1) {
+                reader.readAsArrayBuffer(file);
+            } else {
+                reader.readAsText(file);
+            }
         }
 
         function parseData(str) {
             try {
-                try { state.orig = JSON.parse(str); } catch { state.orig = JSON.parse(atob(str)); }
-                state.tasks = deepScan(state.orig);
-                const name = state.orig.data?.name || state.orig.name || '未知角色';
-                document.getElementById('fileInfo').innerHTML = `<div class="text-xl">📄</div><div class="font-bold">${name}</div>`;
+                var d;
+                try { d = JSON.parse(str); } 
+                catch (e) { 
+                    var b = atob(str); 
+                    var arr = new Uint8Array(b.length);
+                    for(var i=0; i<b.length; i++) arr[i] = b.charCodeAt(i);
+                    d = JSON.parse(new TextDecoder('utf-8').decode(arr));
+                }
                 
-                const report = document.getElementById('scanDetails');
-                const counts = { core: 0, book: 0, alt: 0 };
-                state.tasks.forEach(t => {
-                    if (t.path[0] === 'character_book') counts.book++;
-                    else if (t.path[0].includes('greetings')) counts.alt++;
-                    else counts.core++;
-                });
-                report.innerText = `发现 \({state.tasks.length} 个任务：基础字段 \){counts.core} | 问候语 \({counts.alt} | 世界书 \){counts.book}`;
-                document.getElementById('scanReport').classList.remove('hidden');
+                var data = d.data || d;
+                document.getElementById('dropZone').classList.add('hidden');
+                document.getElementById('contentArea').classList.remove('hidden');
+                
+                var cBox = document.getElementById('charContainer'); cBox.innerHTML = '';
+                var wBox = document.getElementById('worldContainer'); wBox.innerHTML = '';
 
-                checkStart();
-                toast('解析成功', 'success');
-            } catch(e) { console.error(e); toast('格式错误', 'error'); }
-        }
-
-        function checkStart() {
-            const ready = state.orig && !document.getElementById('modelSelect').disabled;
-            const btn = document.getElementById('startBtn');
-            if (ready) { btn.classList.remove('hidden'); btn.disabled = false; } else { btn.classList.add('hidden'); }
-        }
-
-        // --- 转换 (强力修正版) ---
-        function start() {
-            document.getElementById('startBtn').classList.add('hidden');
-            document.getElementById('controlPanel').classList.remove('hidden');
-            document.getElementById('progressArea').classList.remove('hidden');
-            document.getElementById('exportArea').classList.add('hidden');
-            document.getElementById('log').innerHTML = '';
-            document.getElementById('retryBtn').classList.add('hidden');
-
-            state.conv = JSON.parse(JSON.stringify(state.orig));
-            state.tasks = deepScan(state.conv); 
-            
-            state.total = state.tasks.length;
-            state.done = 0;
-            state.active = 0;
-            state.paused = false;
-            
-            renderLog();
-            processQueue();
-        }
-
-        function renderLog() {
-            const log = document.getElementById('log');
-            log.innerHTML = state.tasks.map((t, i) => `
-                <div id="task-${i}" class="flex items-center justify-between p-1 hover:bg-white/5 rounded">
-                    <div class="flex items-center gap-2 truncate w-full">
-                        <span class="status-dot pending flex-shrink-0"></span>
-                        <span class="truncate text-gray-300 text-[10px]">${t.name}</span>
-                        <span class="tag">${t.path[0]==='character_book'?'世界书':(t.path[0].includes('greetings')?'问候':'基础')}</span>
-                    </div>
-                    <span class="text-[10px] opacity-50 ml-2 error-msg text-red-400"></span>
-                </div>
-            `).join('');
-        }
-
-        function updateStatus(idx, status, msg='') {
-            state.tasks[idx].status = status;
-            const el = document.getElementById(`task-${idx}`);
-            if (el) {
-                el.querySelector('.status-dot').className = `status-dot ${status}`;
-                if (msg) el.querySelector('.error-msg').innerText = msg;
-            }
-            const pct = (state.done / state.total) * 100;
-            document.getElementById('bar').style.width = `${pct}%`;
-            document.getElementById('progressText').innerText = `\({state.done}/\){state.total}`;
-            if (state.done === state.total) finish();
-        }
-
-        function processQueue() {
-            if (state.paused) return;
-            if (state.done === state.total) { finish(); return; }
-            const pending = state.tasks.filter(t => t.status === 'pending');
-            while (state.active < 5 && pending.length > 0 && !state.paused) {
-                const task = pending.shift();
-                const idx = state.tasks.indexOf(task);
-                runTask(task, idx);
-            }
-        }
-
-        async function runTask(task, idx) {
-            state.active++;
-            updateStatus(idx, 'processing');
-            
-            let url = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
-            if (!url.endsWith('/chat/completions')) url += '/chat/completions';
-            
-            const key = document.getElementById('apiKey').value;
-            const model = document.getElementById('modelSelect').value;
-            
-            // 设定目标
-            const isToMale = state.gender === 'male';
-            const targetGender = isToMale ? '男性' : '女性';
-            const targetPronoun = isToMale ? '他' : '她';
-            const avoidPronoun = isToMale ? '她' : '他';
-
-            // 🔥 强力修正 Prompt
-            const prompt = `你是一个小说重写工具。
-【任务】：将片段中所有指代【对话对象/伴侣/暗恋对象/另一方】的词汇，强制修改为【${targetGender}】。
-
-【当前目标】：将用户(User)转为 ${targetGender}。
-
-【强制执行规则】：
-1. **代词大清洗**：
-   - 只要文中出现“\({avoidPronoun}”（\){isToMale ? '她' : '他'}），且语境上是指代主角关注的那个**人**（而非主角的亲戚或路人），**必须**改为“${targetPronoun}”。
-   - 哪怕文中没有出现 {{user}} 标签，只要是主角在回忆、对话、心理活动中想念的“那个人”，一律视为用户，必须修改性别！
-
-2. **生理特征替换**（必须执行）：
-   - ${isToMale ? '将“乳房/花穴/湿了/小腹/裙子”等女性特征，改为男性的“胸膛/后穴/前列腺液/腹肌/裤子”等。' : '将男性特征修改为女性对应器官。'}
-   - 遇到“那个人”、“那家伙”等模糊称呼，如果后面跟着性别特征描写，也要适配修改。
-
-3. **输出要求**：
-   - 严禁解释，严禁废话。
-   - 保持原格式，只输出修改后的正文。`;
-
-            try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-                    body: JSON.stringify({
-                        model: model,
-                        messages: [ 
-                            { role: 'system', content: prompt }, 
-                            { role: 'user', content: `待修改文本：\n${task.val}` } 
-                        ],
-                        temperature: 0.1, // 降低温度以保证指令执行
-                        max_tokens: 8192
-                    })
+                // 基础字段
+                var map = [['description','描述'], ['first_mes','开场白'], ['personality','性格'], ['scenario','场景'], ['mes_example','示例'], ['system_prompt','系统提示'], ['post_history_instructions','后指令']];
+                
+                map.forEach(function(item) {
+                    var k = item[0]; var l = item[1];
+                    if (data[k]) addCard(cBox, l, data[k]);
                 });
 
-                if (!res.ok) {
-                    const txt = await res.text();
-                    let errMsg = res.status;
-                    try { errMsg += ' ' + JSON.parse(txt).error.message; } catch {}
-                    throw new Error(errMsg);
+                if (data.alternate_greetings) {
+                    data.alternate_greetings.forEach(function(v,i) { addCard(cBox, '备用 #'+(i+1), v); });
                 }
+                if (data.group_only_greetings) {
+                    data.group_only_greetings.forEach(function(v,i) { addCard(cBox, '群聊 #'+(i+1), v); });
+                }
+
+                // 世界书 (使用 && 代替 ?.)
+                var books = [];
+                if (data.character_book && data.character_book.entries) books = data.character_book.entries;
+                else if (d.character_book && d.character_book.entries) books = d.character_book.entries;
+
+                document.getElementById('worldCount').innerText = books.length + ' 条目';
                 
-                const json = await res.json();
-                let newText = json.choices[0].message.content;
-                
-                // 清理可能的废话
-                newText = newText.replace(/^修改后[：:]\s*/i, '').replace(/^Here is the rewritten text[：:]\s*/i, '');
+                books.forEach(function(e,i) {
+                    if (!e.content) return;
+                    var t = e.comment || (e.keys ? 'Keys: '+e.keys.join(', ') : '#'+(i+1));
+                    addCard(wBox, t, e.content);
+                });
 
-                let ptr = state.conv.data || state.conv;
-                if (task.path[0] === 'character_book' && !ptr.character_book && state.conv.character_book) {
-                    ptr = state.conv;
-                }
-
-                for (let i = 0; i < task.path.length - 1; i++) {
-                    if (ptr[task.path[i]]) ptr = ptr[task.path[i]];
-                }
-                ptr[task.path[task.path.length - 1]] = newText;
-
-                updateStatus(idx, 'done');
-            } catch (e) {
-                console.error(e);
-                updateStatus(idx, 'error', e.message);
-            } finally {
-                state.active--;
-                state.done++;
-                processQueue();
-            }
+            } catch(e) { console.error(e); alert('解析失败: ' + e.message); }
         }
 
-        function togglePause() {
-            if (state.done === state.total && state.total > 0) { finish(); return; }
-            state.paused = !state.paused;
-            const btn = document.getElementById('pauseBtn');
-            btn.innerText = state.paused ? '▶️ 继续' : '⏸️ 暂停';
-            btn.className = state.paused ? 'glass-input p-3 font-bold bg-blue-500/20 text-blue-300' : 'glass-input p-3 font-bold';
-            if (!state.paused) processQueue();
-        }
-
-        function retryFailed() {
-            state.tasks.forEach((t, i) => {
-                if (t.status === 'error') { t.status = 'pending'; state.done--; updateStatus(i, 'pending', ''); }
-            });
-            document.getElementById('retryBtn').classList.add('hidden');
-            state.paused = false;
-            processQueue();
-        }
-
-        function finish() {
-            document.getElementById('statusText').innerText = '处理完成';
-            document.getElementById('controlPanel').classList.add('hidden');
-            document.getElementById('exportArea').classList.remove('hidden');
+        function addCard(box, title, text) {
+            var div = document.createElement('div'); div.className = 'card';
             
-            const errors = state.tasks.filter(t => t.status === 'error').length;
-            if (errors > 0) {
-                document.getElementById('controlPanel').classList.remove('hidden');
-                document.getElementById('retryBtn').classList.remove('hidden');
-                document.getElementById('pauseBtn').classList.add('hidden');
-                toast(`${errors} 个项目失败`, 'error');
-            } else {
-                const startBtn = document.getElementById('startBtn');
-                startBtn.innerText = '✅ 转换成功 (点击刷新)';
-                startBtn.classList.remove('hidden'); startBtn.disabled = false;
-                startBtn.onclick = () => location.reload();
-                toast('全部完成！', 'success');
-            }
-            
-            if (!document.getElementById('controlPanel').classList.contains('hidden')) {
-                 const pauseBtn = document.getElementById('pauseBtn');
-                 pauseBtn.innerText = '✅ 完成并导出';
-                 pauseBtn.className = 'btn-primary p-3 font-bold';
-            }
+            var header = document.createElement('div'); header.className = 'card-header';
+            var span = document.createElement('span'); span.innerText = title;
+            var btn = document.createElement('button'); 
+            btn.className = 'btn btn-blue'; 
+            btn.style.width = 'auto'; btn.style.padding = '4px 8px'; btn.style.fontSize = '12px'; btn.style.marginBottom = '0';
+            btn.innerText = '复制';
+            btn.onclick = function() { copy(this); };
 
-            // Diff Preview
-            let diffHtml = '';
-            state.tasks.forEach((t, i) => {
-                let ptr = state.conv.data || state.conv;
-                if (t.path[0] === 'character_book' && !ptr.character_book && state.conv.character_book) ptr = state.conv;
-                for (let k = 0; k < t.path.length - 1; k++) ptr = ptr[t.path[k]];
-                const newVal = ptr[t.path[t.path.length - 1]];
+            header.appendChild(span); header.appendChild(btn);
 
-                if (t.status === 'done' && t.val !== newVal) {
-                    diffHtml += `\n=== \({t.name} ===\n[原]: \){t.val.substring(0, 60)}...\n[新]: ${newVal.substring(0, 60)}...\n`;
-                }
+            var body = document.createElement('div'); body.className = 'card-body';
+            var txtDiv = document.createElement('div'); txtDiv.className = 'text-content';
+            txtDiv.innerText = text;
+
+            body.appendChild(txtDiv);
+            div.appendChild(header); div.appendChild(body);
+            box.appendChild(div);
+        }
+
+        function copy(btn) {
+            var txt = btn.parentElement.nextElementSibling.innerText;
+            navigator.clipboard.writeText(txt).then(function() {
+                var old = btn.innerText; btn.innerText = 'OK';
+                setTimeout(function(){ btn.innerText=old; }, 1000);
             });
-            document.getElementById('diffBox').innerText = diffHtml || '内容无变化';
         }
 
-        function exportFile(type) {
-            const suffix = state.gender === 'male' ? 'MaleUser' : 'FemaleUser';
-            const name = `\({state.fname}_\){suffix}.${type}`;
-            if (type === 'json') {
-                const blob = new Blob([JSON.stringify(state.conv, null, 2)], {type: 'application/json'});
-                save(blob, name);
-            } else {
-                if (!state.pngBuf) return toast('原图丢失', 'error');
-                const str = JSON.stringify(state.conv);
-                const b64 = btoa(unescape(encodeURIComponent(str)));
-                const newBuf = packPng(state.pngBuf, b64);
-                const blob = new Blob([newBuf], {type: 'image/png'});
-                save(blob, name);
-            }
-        }
-
-        function save(blob, name) {
-            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
-        }
-
-        function packPng(buf, text) {
-            const chunks = []; let p = 8; chunks.push(buf.slice(0, 8));
-            let charaInserted = false;
-            const makeChunk = (t, d) => {
-                const len = d.length; const b = new Uint8Array(12 + len);
-                new DataView(b.buffer).setUint32(0, len); b.set(new TextEncoder().encode(t), 4); b.set(d, 8);
-                const crc = calcCrc(b.slice(4, 8+len)); new DataView(b.buffer).setUint32(8+len, crc); return b;
-            };
-            while (p < buf.length) {
-                const len = new DataView(buf.buffer).getUint32(p);
-                const type = new TextDecoder().decode(buf.slice(p+4, p+8));
-                if (type === 'IEND') {
-                    if (!charaInserted) {
-                        const key = new TextEncoder().encode('chara'); const val = new TextEncoder().encode(text);
-                        const d = new Uint8Array(key.length + 1 + val.length); d.set(key); d[key.length] = 0; d.set(val, key.length+1);
-                        chunks.push(makeChunk('tEXt', d));
-                    }
-                    chunks.push(buf.slice(p, p+12)); break;
-                }
-                if (type === 'tEXt' || type === 'iTXt') {
-                    const d = buf.slice(p+8, p+8+len); const kEnd = d.indexOf(0);
-                    const k = new TextDecoder().decode(d.slice(0, kEnd));
-                    if (k === 'chara') {
-                        const key = new TextEncoder().encode('chara'); const val = new TextEncoder().encode(text);
-                        const data = new Uint8Array(key.length + 1 + val.length); data.set(key); data[key.length] = 0; data.set(val, key.length+1);
-                        chunks.push(makeChunk('tEXt', data)); charaInserted = true; p += 12 + len; continue;
+        function extractPng(buf) {
+            var view = new DataView(buf.buffer); var p=8; var dec = new TextDecoder('utf-8');
+            while(p < buf.length) {
+                var len = view.getUint32(p); 
+                var type = dec.decode(buf.slice(p+4, p+8));
+                if(type === 'tEXt' || type === 'iTXt') {
+                    var d = buf.slice(p+8, p+8+len); 
+                    var split = d.indexOf(0);
+                    if(dec.decode(d.slice(0, split)) === 'chara') {
+                        if (type === 'tEXt') return dec.decode(d.slice(split+1));
+                        else {
+                            // 简化版 iTXt 提取，跳过头部
+                            var sub = d.slice(split+1); 
+                            var idx = sub.indexOf(0); // compFlag, method, lang...
+                            // 暴力跳过：直接找最后一个 null 后的内容，通常是安全的
+                            // 或者直接返回 sub.slice(idx+...)，这里用更安全的方法：
+                            // iTXt 结构: key \0 flag method lang \0 transKey \0 text
+                            var p2 = split + 3; // skip flag(1) method(1)
+                            while (p2 < d.length && d[p2] !== 0) p2++; p2++; // lang
+                            while (p2 < d.length && d[p2] !== 0) p2++; p2++; // transKey
+                            return dec.decode(d.slice(p2));
+                        }
                     }
                 }
-                chunks.push(buf.slice(p, p+12+len)); p += 12 + len;
+                p += 12+len;
             }
-            const total = chunks.reduce((a,c)=>a+c.length,0); const res = new Uint8Array(total);
-            let off = 0; chunks.forEach(c => { res.set(c, off); off += c.length; }); return res;
+            return null;
         }
-
-        const crcTable = [];
-        for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? 0xedb88320 ^ (c >>> 1) : c >>> 1; crcTable[n] = c; }
-        function calcCrc(buf) { let c = 0xffffffff; for (let i = 0; i < buf.length; i++) c = crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8); return c ^ 0xffffffff; }
     </script>
 </body>
 </html>
