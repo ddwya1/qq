@@ -3,597 +3,531 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SillyTavern 角色卡性别转换工具 (终极版)</title>
+    <title>SillyTavern 角色卡性别转换 (全域扫描版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * { -webkit-tap-highlight-color: transparent; }
-        :root { --glass-bg: rgba(30, 30, 40, 0.95); --glass-border: rgba(255, 255, 255, 0.1); --accent-pink: #ff6b9d; --accent-blue: #4fc3f7; --accent-purple: #b388ff; }
-        body { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f0f1a 100%); min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-        .glass { background: var(--glass-bg); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid var(--glass-border); border-radius: 16px; }
-        .glass-input, .glass-select { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; color: white; transition: all 0.3s ease; }
-        .glass-input:focus, .glass-select:focus { outline: none; border-color: var(--accent-purple); box-shadow: 0 0 20px rgba(179, 136, 255, 0.3); }
-        .glass-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='white' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 20px; padding-right: 40px; }
-        .glass-select option { background: #1a1a2e; color: white; }
-        .btn-primary { background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple)); border: none; border-radius: 12px; color: white; font-weight: 600; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(255, 107, 157, 0.3); }
-        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(255, 107, 157, 0.4); }
+        :root { --glass-bg: rgba(10, 10, 15, 0.98); --glass-border: rgba(255, 255, 255, 0.08); --accent: #3b82f6; }
+        body { background: #020202; color: #e4e4e7; min-height: 100vh; font-family: sans-serif; }
+        .glass { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 12px; }
+        .glass-input, .glass-select { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; transition: 0.2s; }
+        .glass-input:focus { border-color: var(--accent); outline: none; }
+        .btn-primary { background: var(--accent); color: white; border-radius: 8px; font-weight: bold; transition: 0.2s; }
+        .btn-primary:hover:not(:disabled) { filter: brightness(1.2); box-shadow: 0 0 15px rgba(59, 130, 246, 0.3); }
         .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
-        .btn-warning { background: linear-gradient(135deg, #ff9800, #f57c00); color: white; border-radius: 12px; font-weight: 600; transition: all 0.3s ease; }
-        .btn-secondary { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 12px; color: white; transition: all 0.3s ease; }
-        .btn-secondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.15); }
-        .btn-icon { background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 10px; color: white; padding: 8px 12px; transition: all 0.3s ease; font-size: 14px; }
-        .toggle-btn { position: relative; background: rgba(255, 255, 255, 0.1); border-radius: 25px; padding: 4px; display: flex; gap: 4px; }
-        .toggle-option { padding: 10px 20px; border-radius: 20px; cursor: pointer; transition: all 0.3s ease; font-weight: 500; z-index: 1; }
-        .toggle-option.active { background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); color: white; }
-        .toggle-option:not(.active) { color: rgba(255, 255, 255, 0.6); }
-        .file-drop-zone { border: 2px dashed rgba(255, 255, 255, 0.3); border-radius: 16px; transition: all 0.3s ease; cursor: pointer; }
-        .file-drop-zone:hover, .file-drop-zone.dragover { border-color: var(--accent-purple); background: rgba(179, 136, 255, 0.1); }
-        .progress-bar { height: 4px; background: rgba(255, 255, 255, 0.1); border-radius: 2px; overflow: hidden; }
-        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-pink), var(--accent-purple)); transition: width 0.3s ease; }
-        .toast { position: fixed; top: 20px; right: 20px; padding: 16px 24px; border-radius: 12px; color: white; font-weight: 500; z-index: 9999; animation: slideIn 0.3s ease; max-width: calc(100vw - 40px); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        .toast.success { background: linear-gradient(135deg, #00c853, #00bfa5); }
-        .toast.error { background: linear-gradient(135deg, #ff5252, #ff1744); }
-        .toast.info { background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple)); }
-        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        .diff-added { background: rgba(0, 200, 83, 0.3); color: #69f0ae; padding: 2px 4px; border-radius: 4px; }
-        .diff-removed { background: rgba(255, 82, 82, 0.3); color: #ff8a80; padding: 2px 4px; border-radius: 4px; text-decoration: line-through; }
-        .preview-section { max-height: 300px; overflow-y: auto; }
-        .card-preview-img { max-width: 120px; max-height: 160px; border-radius: 12px; object-fit: cover; border: 2px solid rgba(255, 255, 255, 0.2); }
-        .status-indicator { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; flex-shrink: 0; }
-        .status-indicator.pending { background: #ffd54f; }
-        .status-indicator.processing { background: var(--accent-blue); animation: pulse 1s infinite; }
-        .status-indicator.done { background: #69f0ae; }
-        .status-indicator.error { background: #ff5252; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .field-item { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
-        .collapsible-header { cursor: pointer; display: flex; justify-content: space-between; align-items: center; width: 100%; }
-        .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; width: 100%; }
-        .collapsible-content.open { max-height: 2000px; }
-        .chevron { transition: transform 0.3s ease; }
-        .chevron.open { transform: rotate(180deg); }
-        .spinner { width: 16px; height: 16px; border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; display: inline-block; margin-left: 8px; }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .error-msg { font-size: 0.75rem; color: #ff8a80; margin-left: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 150px; display: inline-block; vertical-align: middle; }
+        .progress-bar { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: var(--accent); transition: width 0.2s; }
+        .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; color: white; z-index: 9999; animation: slideIn 0.3s; box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+        .toast.success { background: #10b981; } .toast.error { background: #ef4444; } .toast.info { background: #3b82f6; }
+        @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 8px; }
+        .status-dot.pending { background: #52525b; } .status-dot.processing { background: #3b82f6; animation: pulse 1s infinite; }
+        .status-dot.done { background: #10b981; } .status-dot.error { background: #ef4444; }
+        @keyframes pulse { 50% { opacity: 0.5; } }
+        .hidden { display: none; }
+        .tag { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.1); color: #aaa; margin-left: 6px; }
     </style>
 </head>
-<body class="text-white p-4 pb-20">
-    <div class="max-w-2xl mx-auto">
-        <div class="text-center mb-6">
-            <h1 class="text-2xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-blue-400 bg-clip-text text-transparent">
-                🎭 角色卡性别转换工具 Pro
-            </h1>
-            <p class="text-gray-400 text-sm mt-2">并发加速 · 暂停续传 · 错误重试</p>
-        </div>
+<body class="p-4 pb-20 max-w-2xl mx-auto">
+    <div class="text-center mb-6">
+        <h1 class="text-2xl font-bold text-blue-400">🔍 全域角色卡重构工具</h1>
+        <p class="text-xs text-gray-500 mt-1">深度递归扫描 · 世界书无死角覆盖</p>
+    </div>
 
-        <div class="glass p-4 mb-4">
-            <div class="collapsible-header" onclick="toggleCollapsible('api-settings')">
-                <h2 class="text-lg font-semibold flex items-center">
-                    <span class="mr-2">⚙️</span> API 设置
-                </h2>
-                <span class="chevron" id="api-settings-chevron">▼</span>
+    <!-- API 设置 -->
+    <div class="glass p-4 mb-4">
+        <h2 class="font-bold mb-3 text-sm text-gray-300">⚙️ API 连接</h2>
+        <div class="space-y-3">
+            <input type="text" id="apiUrl" class="glass-input w-full p-2 text-sm" placeholder="API URL" onchange="clearModelList()">
+            <input type="password" id="apiKey" class="glass-input w-full p-2 text-sm" placeholder="API Key (sk-...)" onchange="clearModelList()">
+            <div class="flex gap-2">
+                <select id="modelSelect" class="glass-select flex-1 p-2 text-sm" disabled><option>请先加载模型</option></select>
+                <button onclick="loadModels()" id="loadBtn" class="glass-input px-4 text-sm hover:bg-white/5">🔄 加载</button>
             </div>
-            <div class="collapsible-content open" id="api-settings">
-                <div class="mt-4 space-y-3">
-                    <div>
-                        <label class="block text-sm text-gray-400 mb-1">API URL</label>
-                        <input type="text" id="apiUrl" class="glass-input w-full px-4 py-3 text-sm" placeholder="https://api.openai.com/v1" value="https://api.deepseek.com/v1" onchange="clearModelList()">
-                        <p class="text-xs text-gray-500 mt-1">💡 自动补全 /chat/completions</p>
-                    </div>
-                    <div>
-                        <label class="block text-sm text-gray-400 mb-1">API Key</label>
-                        <input type="password" id="apiKey" class="glass-input w-full px-4 py-3 text-sm" placeholder="sk-xxxxxxxxxxxxxxxx" onchange="clearModelList()">
-                    </div>
-                    <div>
-                        <label class="block text-sm text-gray-400 mb-1">选择模型</label>
-                        <div class="flex gap-2">
-                            <select id="modelSelect" class="glass-select flex-1 px-4 py-3 text-sm" disabled>
-                                <option value="">请先加载模型列表</option>
-                            </select>
-                            <button id="loadModelsBtn" class="btn-icon whitespace-nowrap" onclick="loadModels()">🔄 加载</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="glass p-4 mb-4">
-            <h2 class="text-lg font-semibold mb-3 flex items-center">
-                <span class="mr-2">🎯</span> 目标性别
-            </h2>
-            <div class="toggle-btn">
-                <div class="toggle-option active" id="toggle-male" onclick="setTargetGender('male')">♂️ 转为男性 User</div>
-                <div class="toggle-option" id="toggle-female" onclick="setTargetGender('female')">♀️ 转为女性 User</div>
-            </div>
-        </div>
-
-        <div class="glass p-4 mb-4">
-            <h2 class="text-lg font-semibold mb-3 flex items-center">
-                <span class="mr-2">📁</span> 导入角色卡
-            </h2>
-            <div class="file-drop-zone p-8 text-center" id="dropZone" onclick="document.getElementById('fileInput').click()">
-                <input type="file" id="fileInput" class="hidden" accept=".png,.json" onchange="handleFileSelect(event)">
-                <div class="text-4xl mb-3">📤</div>
-                <p class="text-gray-300">点击或拖拽文件到此处</p>
-            </div>
-            <div id="cardPreview" class="hidden mt-4">
-                <div class="flex items-start gap-4">
-                    <img id="previewImage" class="card-preview-img" src="" alt="Card Preview">
-                    <div class="flex-1 min-w-0">
-                        <h3 id="cardName" class="font-semibold text-lg truncate"></h3>
-                        <p id="cardCreator" class="text-sm text-gray-400"></p>
-                        <div class="flex flex-wrap gap-2 mt-2">
-                            <span class="text-xs px-2 py-1 bg-purple-500/20 rounded-full" id="cardSpec"></span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 转换控制区域 -->
-        <div id="controlPanel" class="hidden mb-4 grid grid-cols-2 gap-3">
-            <button id="pauseBtn" class="btn-secondary py-3 text-lg font-semibold" onclick="togglePause()">⏸️ 暂停</button>
-            <button id="retryBtn" class="btn-warning py-3 text-lg font-semibold hidden" onclick="retryFailed()">🔄 重试失败项</button>
-        </div>
-
-        <button id="convertBtn" class="btn-primary w-full py-4 text-lg mb-4" onclick="initConversion()" disabled>🚀 开始极速转换</button>
-
-        <div id="progressSection" class="glass p-4 mb-4 hidden">
-            <div class="flex justify-between items-center mb-3">
-                <h2 class="text-lg font-semibold flex items-center"><span class="mr-2">⏳</span> 转换进度</h2>
-                <span id="progressCount" class="text-xs text-gray-400">0/0</span>
-            </div>
-            <div class="progress-bar mb-3">
-                <div class="progress-fill" id="progressBar" style="width: 0%"></div>
-            </div>
-            <div id="progressStatus" class="text-sm text-gray-400 mb-2">准备就绪...</div>
-            <div id="fieldProgress" class="mt-3 max-h-60 overflow-y-auto pr-1"></div>
-        </div>
-
-        <div id="diffSection" class="glass p-4 mb-4 hidden">
-            <h2 class="text-lg font-semibold mb-3 flex items-center"><span class="mr-2">📝</span> 修改预览</h2>
-            <div id="diffContent" class="space-y-4"></div>
-        </div>
-
-        <div id="exportSection" class="glass p-4 hidden">
-            <h2 class="text-lg font-semibold mb-3 flex items-center"><span class="mr-2">💾</span> 导出文件</h2>
-            <div class="grid grid-cols-2 gap-3">
-                <button class="btn-primary py-3" onclick="exportPNG()">📥 下载 PNG</button>
-                <button class="btn-secondary py-3" onclick="exportJSON()">📄 下载 JSON</button>
-            </div>
-        </div>
-        
-        <div class="text-center text-gray-500 text-xs mt-8">
-            <p>Made with ❤️ for SillyTavern Community</p>
         </div>
     </div>
 
+    <!-- 目标性别 -->
+    <div class="glass p-4 mb-4">
+        <div class="flex gap-2">
+            <button id="btn-male" class="flex-1 p-3 rounded-lg border border-transparent bg-white/5 text-gray-400 transition" onclick="setGender('male')">转为男性 User ♂️</button>
+            <button id="btn-female" class="flex-1 p-3 rounded-lg border border-transparent bg-white/5 text-gray-400 transition" onclick="setGender('female')">转为女性 User ♀️</button>
+        </div>
+    </div>
+
+    <!-- 文件操作 -->
+    <div class="glass p-4 mb-4 text-center border-dashed border-2 border-white/10 hover:border-blue-500/50 transition cursor-pointer" onclick="document.getElementById('fileInput').click()" id="dropZone">
+        <input type="file" id="fileInput" class="hidden" accept=".png,.json" onchange="handleFile(this.files[0])">
+        <div id="fileInfo" class="py-4">
+            <div class="text-2xl mb-2">📂</div>
+            <div class="text-sm text-gray-400">点击上传 PNG / JSON</div>
+        </div>
+    </div>
+
+    <!-- 扫描报告 -->
+    <div id="scanReport" class="glass p-3 mb-4 hidden bg-blue-500/10 border-blue-500/30">
+        <div class="text-sm font-bold text-blue-300">📊 扫描报告</div>
+        <div id="scanDetails" class="text-xs text-gray-400 mt-1"></div>
+    </div>
+
+    <!-- 控制台 -->
+    <div id="controlPanel" class="hidden grid grid-cols-2 gap-3 mb-4">
+        <button id="pauseBtn" class="glass-input p-3 font-bold" onclick="togglePause()">⏸️ 暂停</button>
+        <button id="retryBtn" class="glass-input p-3 font-bold text-red-400 hidden" onclick="retryFailed()">🔄 重试失败项</button>
+    </div>
+
+    <button id="startBtn" class="btn-primary w-full p-4 mb-4 text-lg hidden" onclick="start()">🚀 开始全域转换</button>
+
+    <!-- 进度 -->
+    <div id="progressArea" class="glass p-4 mb-4 hidden">
+        <div class="flex justify-between text-xs mb-2">
+            <span id="statusText">准备中...</span>
+            <span id="progressText">0/0</span>
+        </div>
+        <div class="progress-bar mb-3"><div id="bar" class="progress-fill" style="width:0%"></div></div>
+        <div id="log" class="text-xs font-mono text-gray-400 max-h-60 overflow-y-auto space-y-1 pr-1"></div>
+    </div>
+
+    <!-- 导出 -->
+    <div id="exportArea" class="glass p-4 hidden">
+        <h3 class="font-bold mb-3">💾 导出结果</h3>
+        <div class="grid grid-cols-2 gap-3">
+            <button class="btn-primary p-3" onclick="exportFile('png')">下载 PNG</button>
+            <button class="glass-input p-3" onclick="exportFile('json')">下载 JSON</button>
+        </div>
+        <div id="diffBox" class="mt-4 text-xs bg-black/30 p-2 rounded max-h-60 overflow-y-auto whitespace-pre-wrap font-mono text-gray-400"></div>
+    </div>
+
     <script>
-        var state = {
-            targetGender: 'male',
-            originalData: null,
-            convertedData: null,
-            originalPngBuffer: null,
-            originalFileName: '',
-            cardImageDataUrl: '',
-            availableModels: [],
-            isProcessing: false,
-            isPaused: false,
+        const state = {
+            gender: 'male',
+            orig: null,
+            conv: null,
+            pngBuf: null,
+            fname: '',
             tasks: [],
-            activeTasks: 0,
-            maxConcurrency: 5,
-            completedCount: 0,
-            totalCount: 0
+            active: 0,
+            done: 0,
+            total: 0,
+            paused: false
         };
 
-        function showToast(message, type, duration) {
-            type = type || 'info'; duration = duration || 3000;
-            var toast = document.createElement('div'); toast.className = 'toast ' + type; toast.textContent = message;
-            document.body.appendChild(toast);
-            setTimeout(function() { toast.style.animation = 'slideIn 0.3s ease reverse'; setTimeout(function() { toast.remove(); }, 300); }, duration);
+        // --- 深度扫描引擎 ---
+        function deepScan(data) {
+            const tasks = [];
+            const d = data.data || data; // 兼容 wrap
+
+            // 1. 基础字段 (Core Fields)
+            const coreFields = [
+                'description', 'first_mes', 'scenario', 'mes_example', 
+                'personality', 'system_prompt', 'post_history_instructions', 
+                'depth_prompt', 'room_prototype_id'
+            ];
+            
+            coreFields.forEach(k => {
+                if (d[k] && typeof d[k] === 'string' && d[k].trim()) {
+                    tasks.push({ path: [k], name: mapName(k), val: d[k], status: 'pending' });
+                }
+            });
+
+            // 2. 数组字段 (Arrays)
+            if (Array.isArray(d.alternate_greetings)) {
+                d.alternate_greetings.forEach((v, i) => {
+                    if (v && v.trim()) tasks.push({ path: ['alternate_greetings', i], name: `备用问候 ${i+1}`, val: v, status: 'pending' });
+                });
+            }
+            if (Array.isArray(d.group_only_greetings)) {
+                d.group_only_greetings.forEach((v, i) => {
+                    if (v && v.trim()) tasks.push({ path: ['group_only_greetings', i], name: `群聊问候 ${i+1}`, val: v, status: 'pending' });
+                });
+            }
+
+            // 3. 世界书 (World Info / Character Book)
+            const book = d.character_book || d.lorebook;
+            if (book && book.entries && Array.isArray(book.entries)) {
+                book.entries.forEach((entry, i) => {
+                    if (entry.content && entry.content.trim()) {
+                        const keys = entry.keys ? entry.keys.join(', ').substring(0, 15) : i;
+                        tasks.push({ 
+                            path: ['character_book', 'entries', i, 'content'], 
+                            name: `世界书 [${keys}...]`, 
+                            val: entry.content, 
+                            status: 'pending' 
+                        });
+                    }
+                });
+            }
+
+            return tasks;
         }
 
-        function toggleCollapsible(id) {
-            var content = document.getElementById(id);
-            var chevron = document.getElementById(id + '-chevron');
-            content.classList.toggle('open');
-            chevron.classList.toggle('open');
+        function mapName(key) {
+            const map = {
+                'description': '角色描述', 'first_mes': '首条消息', 'scenario': '场景设定',
+                'mes_example': '对话示例', 'personality': '性格特征', 'system_prompt': '系统提示词',
+                'post_history_instructions': '历史后指令', 'depth_prompt': '深度提示词'
+            };
+            return map[key] || key;
         }
 
-        function getBaseUrl(url) { return url.replace(/\/\(/, '').replace(/\/chat\/completions\)/, ''); }
-        function getChatUrl(url) { url = url.replace(/\/$/, ''); if (url.endsWith('/chat/completions')) return url; return url + '/chat/completions'; }
+        // --- 基础逻辑 ---
+        function setGender(g) {
+            state.gender = g;
+            document.getElementById('btn-male').className = `flex-1 p-3 rounded-lg border ${g==='male'?'border-blue-500 bg-blue-500/10 text-white':'bg-white/5 text-gray-400'}`;
+            document.getElementById('btn-female').className = `flex-1 p-3 rounded-lg border ${g==='female'?'border-blue-500 bg-blue-500/10 text-white':'bg-white/5 text-gray-400'}`;
+        }
+        setGender('male');
 
-        function setTargetGender(gender) {
-            state.targetGender = gender;
-            document.getElementById('toggle-male').classList.toggle('active', gender === 'male');
-            document.getElementById('toggle-female').classList.toggle('active', gender === 'female');
+        function toast(msg, type='info') {
+            const t = document.createElement('div'); t.className = `toast ${type}`; t.innerText = msg;
+            document.body.appendChild(t); setTimeout(() => t.remove(), 3000);
+        }
+
+        // --- API ---
+        async function loadModels() {
+            let url = document.getElementById('apiUrl').value.replace(/\/\(/, '').replace(/\/chat\/completions\)/, '');
+            const key = document.getElementById('apiKey').value;
+            const btn = document.getElementById('loadBtn');
+            if(!url || !key) return toast('请填写 URL 和 Key', 'error');
+            
+            btn.disabled = true; btn.innerText = '...';
+            try {
+                const res = await fetch(`\({url}/models`, { headers: { Authorization: `Bearer \){key}` } });
+                const data = await res.json();
+                const sel = document.getElementById('modelSelect');
+                sel.innerHTML = '';
+                (data.data || []).sort((a,b) => a.id.includes('chat') ? -1 : 1).forEach(m => {
+                    const opt = document.createElement('option'); opt.value = m.id; opt.innerText = m.id; sel.appendChild(opt);
+                });
+                sel.disabled = false; if(sel.options.length > 0) sel.selectedIndex = 0;
+                toast(`加载成功`, 'success'); checkStart();
+            } catch(e) { toast('模型加载失败', 'error'); } finally { btn.disabled = false; btn.innerText = '🔄 加载'; }
         }
 
         function clearModelList() {
-            var select = document.getElementById('modelSelect'); select.innerHTML = '';
-            var opt = document.createElement('option'); opt.value = ""; opt.textContent = "请先加载模型列表"; select.appendChild(opt);
-            select.disabled = true; state.availableModels = [];
+            document.getElementById('modelSelect').innerHTML = '<option>请重新加载</option>';
+            document.getElementById('modelSelect').disabled = true;
+            checkStart();
         }
 
-        function loadModels() {
-            var apiUrl = document.getElementById('apiUrl').value.trim();
-            var apiKey = document.getElementById('apiKey').value.trim();
-            if (!apiUrl || !apiKey) { showToast('请先填写 API URL 和 API Key', 'error'); return; }
-            var btn = document.getElementById('loadModelsBtn'); var originalText = btn.innerHTML;
-            btn.disabled = true; btn.innerHTML = '加载中<span class="spinner"></span>';
-            var modelsUrl = getBaseUrl(apiUrl) + '/models';
-            fetch(modelsUrl, { method: 'GET', headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' } })
-            .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
-            .then(function(data) {
-                if (!data.data || !Array.isArray(data.data)) throw new Error('格式错误');
-                state.availableModels = data.data.filter(function(m) { return m.id; }).sort(function(a, b) {
-                    var aIsChat = a.id.toLowerCase().indexOf('chat') !== -1; var bIsChat = b.id.toLowerCase().indexOf('chat') !== -1;
-                    return (aIsChat && !bIsChat) ? -1 : (!aIsChat && bIsChat) ? 1 : a.id.localeCompare(b.id);
-                });
-                var select = document.getElementById('modelSelect'); select.innerHTML = '';
-                state.availableModels.forEach(function(m) { var opt = document.createElement('option'); opt.value = m.id; opt.textContent = m.id; select.appendChild(opt); });
-                select.disabled = false; if (state.availableModels.length > 0) select.value = state.availableModels[0].id;
-                showToast('加载成功', 'success'); updateConvertButtonState();
-            }).catch(function(err) { showToast('加载失败: ' + err.message, 'error'); clearModelList(); })
-            .finally(function() { btn.disabled = false; btn.innerHTML = originalText; });
-        }
+        // --- 文件 ---
+        const dropZone = document.getElementById('dropZone');
+        dropZone.ondragover = e => { e.preventDefault(); dropZone.style.borderColor = '#3b82f6'; };
+        dropZone.ondragleave = e => { e.preventDefault(); dropZone.style.borderColor = ''; };
+        dropZone.ondrop = e => { e.preventDefault(); handleFile(e.dataTransfer.files[0]); };
 
-        var dropZone = document.getElementById('dropZone');
-        dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
-        dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
-        dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.classList.remove('dragover'); var f = e.dataTransfer.files[0]; if(f) processFile(f); });
-        function handleFileSelect(e) { var f = e.target.files[0]; if(f) processFile(f); }
-
-        function processFile(file) {
-            state.originalFileName = file.name.replace(/\.(png|json)$/i, '');
-            var reader = new FileReader();
-            if (file.name.toLowerCase().endsWith('.json')) {
-                reader.onload = function(e) {
-                    try { state.originalData = JSON.parse(e.target.result); state.cardImageDataUrl = ''; onFileLoaded(); } catch(err) { showToast('JSON 解析失败', 'error'); }
-                }; reader.readAsText(file);
-            } else if (file.name.toLowerCase().endsWith('.png')) {
-                reader.onload = function(e) {
-                    try {
-                        state.originalPngBuffer = new Uint8Array(e.target.result);
-                        state.cardImageDataUrl = URL.createObjectURL(file);
-                        var charaData = extractCharaFromPNG(state.originalPngBuffer);
-                        if (!charaData) throw new Error('无角色数据');
-                        try { var jsonStr = atob(charaData); try { jsonStr = decodeURIComponent(escape(jsonStr)); } catch(e){} state.originalData = JSON.parse(jsonStr); } catch(e) { state.originalData = JSON.parse(atob(charaData)); }
-                        onFileLoaded();
-                    } catch(err) { showToast('PNG 解析失败: ' + err.message, 'error'); }
-                }; reader.readAsArrayBuffer(file);
-            }
-        }
-
-        function onFileLoaded() {
-            var data = state.originalData.data || state.originalData;
-            document.getElementById('cardPreview').classList.remove('hidden');
-            var img = document.getElementById('previewImage');
-            if(state.cardImageDataUrl) { img.src = state.cardImageDataUrl; img.classList.remove('hidden'); } else { img.classList.add('hidden'); }
-            document.getElementById('cardName').textContent = data.name || '未知角色';
-            document.getElementById('cardCreator').textContent = data.creator ? 'by ' + data.creator : '';
-            document.getElementById('cardSpec').textContent = (state.originalData.spec || 'V1') + ' v' + (state.originalData.spec_version || '1.0');
-            updateConvertButtonState(); showToast('导入成功', 'success');
-        }
-
-        function updateConvertButtonState() {
-            var hasModel = document.getElementById('modelSelect').value;
-            document.getElementById('convertBtn').disabled = !state.originalData || !hasModel;
-        }
-        document.getElementById('modelSelect').addEventListener('change', updateConvertButtonState);
-
-        function initConversion() {
-            var apiUrl = document.getElementById('apiUrl').value.trim();
-            var apiKey = document.getElementById('apiKey').value.trim();
-            var modelName = document.getElementById('modelSelect').value;
-            if (!apiUrl || !apiKey || !modelName) { showToast('请完善 API 设置', 'error'); return; }
-            
-            document.getElementById('convertBtn').classList.add('hidden');
-            document.getElementById('controlPanel').classList.remove('hidden');
-            document.getElementById('progressSection').classList.remove('hidden');
-            document.getElementById('diffSection').classList.add('hidden');
-            document.getElementById('exportSection').classList.add('hidden');
-            document.getElementById('retryBtn').classList.add('hidden');
-            
-            state.convertedData = JSON.parse(JSON.stringify(state.originalData));
-            var data = state.convertedData.data || state.convertedData;
-            state.tasks = [];
-            
-            var fields = [
-                { key: 'description', label: '角色描述' }, { key: 'first_mes', label: '首条消息' },
-                { key: 'scenario', label: '场景设定' }, { key: 'mes_example', label: '对话示例' },
-                { key: 'personality', label: '性格特征' }, { key: 'system_prompt', label: '系统提示词' }
-            ];
-            fields.forEach(function(f) {
-                if (data[f.key] && data[f.key].trim()) state.tasks.push(createTask(f.key, f.label, data[f.key], function(res) { data[f.key] = res; }));
-            });
-            if (data.alternate_greetings) {
-                data.alternate_greetings.forEach(function(text, i) {
-                    if (text && text.trim()) state.tasks.push(createTask('alt_greeting_' + i, '备用问候 ' + (i+1), text, function(res) { data.alternate_greetings[i] = res; }));
-                });
-            }
-            if (data.character_book && data.character_book.entries) {
-                data.character_book.entries.forEach(function(entry, i) {
-                    if (entry.content && entry.content.trim()) state.tasks.push(createTask('book_' + i, '世界书条目 ' + (i+1), entry.content, function(res) { entry.content = res; }));
-                });
-            }
-            
-            state.totalCount = state.tasks.length; state.completedCount = 0; state.activeTasks = 0;
-            state.isPaused = false; state.isProcessing = true;
-            renderTaskList(); processQueue(getChatUrl(apiUrl), apiKey, modelName);
-        }
-
-        function createTask(id, label, content, updateFn) {
-            return { id: id, label: label, content: content, updateFn: updateFn, status: 'pending', errorMsg: '' };
-        }
-
-        function renderTaskList() {
-            var container = document.getElementById('fieldProgress'); container.innerHTML = '';
-            state.tasks.forEach(function(task) {
-                var div = document.createElement('div'); div.className = 'field-item'; div.id = 'task-el-' + task.id;
-                div.innerHTML = '<div class="flex items-center overflow-hidden"><span class="status-indicator pending"></span><span class="text-sm text-gray-300 truncate">' + task.label + '</span></div><span class="error-msg"></span>';
-                container.appendChild(div);
-            });
-            updateProgressUI();
-        }
-
-        function updateTaskUI(task) {
-            var el = document.getElementById('task-el-' + task.id); if (!el) return;
-            var indicator = el.querySelector('.status-indicator'); var errorSpan = el.querySelector('.error-msg');
-            indicator.className = 'status-indicator ' + task.status;
-            if (task.status === 'error') { errorSpan.textContent = task.errorMsg; errorSpan.title = task.errorMsg; } else { errorSpan.textContent = ''; }
-        }
-
-        function updateProgressUI() {
-            var pct = Math.round((state.completedCount / state.totalCount) * 100) || 0;
-            document.getElementById('progressBar').style.width = pct + '%';
-            document.getElementById('progressCount').textContent = state.completedCount + '/' + state.totalCount;
-            var statusText = state.isPaused ? '已暂停' : (state.activeTasks > 0 ? '正在并发处理 ' + state.activeTasks + ' 个任务...' : '处理完成');
-            document.getElementById('progressStatus').textContent = statusText;
-        }
-
-        function togglePause() {
-            // 如果任务已经全部完成，点击暂停按钮变成手动触发完成
-            if (state.completedCount === state.totalCount && state.totalCount > 0) {
-                onAllFinished();
-                return;
-            }
-            
-            state.isPaused = !state.isPaused;
-            var btn = document.getElementById('pauseBtn');
-            btn.textContent = state.isPaused ? '▶️ 继续' : '⏸️ 暂停';
-            btn.className = state.isPaused ? 'btn-primary py-3 text-lg font-semibold' : 'btn-secondary py-3 text-lg font-semibold';
-            if (!state.isPaused) {
-                var apiUrl = document.getElementById('apiUrl').value.trim(); var apiKey = document.getElementById('apiKey').value.trim(); var modelName = document.getElementById('modelSelect').value;
-                processQueue(getChatUrl(apiUrl), apiKey, modelName);
-            }
-        }
-
-        function retryFailed() {
-            document.getElementById('retryBtn').classList.add('hidden');
-            state.tasks.forEach(function(task) {
-                if (task.status === 'error') { task.status = 'pending'; task.errorMsg = ''; updateTaskUI(task); state.completedCount--; }
-            });
-            state.isPaused = false;
-            var apiUrl = document.getElementById('apiUrl').value.trim(); var apiKey = document.getElementById('apiKey').value.trim(); var modelName = document.getElementById('modelSelect').value;
-            processQueue(getChatUrl(apiUrl), apiKey, modelName);
-        }
-
-        function processQueue(apiUrl, apiKey, modelName) {
-            // 修复 Bug：优先检查是否全部完成，而不是先检查是否暂停
-            // 这样即使在最后时刻暂停，或者有竞态条件，也能保证触发结算
-            if (state.completedCount === state.totalCount) { onAllFinished(); return; }
-            
-            if (state.isPaused) return;
-            
-            while (state.activeTasks < state.maxConcurrency && !state.isPaused) {
-                var task = state.tasks.find(function(t) { return t.status === 'pending'; });
-                if (!task) break;
-                runTask(task, apiUrl, apiKey, modelName);
-            }
-        }
-
-        function runTask(task, apiUrl, apiKey, modelName) {
-            state.activeTasks++; task.status = 'processing'; updateTaskUI(task); updateProgressUI();
-            convertTextWithAI(task.content, apiUrl, apiKey, modelName)
-                .then(function(result) { task.updateFn(result); task.status = 'done'; })
-                .catch(function(err) {
-                    task.status = 'error';
-                    var msg = err.message;
-                    if (msg.indexOf('429') !== -1) msg = '429 请求过多';
-                    else if (msg.indexOf('404') !== -1) msg = '404 接口错误';
-                    else if (msg.indexOf('500') !== -1) msg = '500 服务器错';
-                    else if (msg.indexOf('Failed to fetch') !== -1) msg = '网络连接失败';
-                    task.errorMsg = msg;
-                })
-                .finally(function() {
-                    state.activeTasks--; state.completedCount++; updateTaskUI(task); updateProgressUI();
-                    processQueue(apiUrl, apiKey, modelName);
-                });
-        }
-
-        function onAllFinished() {
-            var hasError = state.tasks.some(function(t) { return t.status === 'error'; });
-            if (hasError) {
-                document.getElementById('retryBtn').classList.remove('hidden');
-                showToast('部分任务失败，请检查并重试', 'error');
+        function handleFile(f) {
+            if (!f) return;
+            state.fname = f.name.replace(/\.(png|json)$/i, '');
+            const reader = new FileReader();
+            if (f.name.endsWith('.json')) {
+                reader.onload = e => parseData(e.target.result);
+                reader.readAsText(f);
             } else {
-                // 强制显示导出，无论预览是否成功
-                document.getElementById('exportSection').classList.remove('hidden');
-                
-                // 隐藏控制面板（包括暂停按钮）
-                document.getElementById('controlPanel').classList.add('hidden');
-                
-                // 显示重新开始按钮
-                var restartBtn = document.getElementById('convertBtn');
-                restartBtn.textContent = '✅ 转换成功 (点击刷新)';
-                restartBtn.classList.remove('hidden');
-                restartBtn.disabled = false;
-                restartBtn.onclick = function() { location.reload(); };
-                
-                // 尝试生成预览，即使失败也不影响导出
-                try { showDiffPreview(); } catch(e) { console.error('预览生成失败', e); }
-                
-                showToast('所有任务转换完成！', 'success');
-            }
-            
-            // 兜底：如果因为某种原因暂停按钮还在，把它改成强制结算按钮
-            if (!document.getElementById('controlPanel').classList.contains('hidden')) {
-                 var pauseBtn = document.getElementById('pauseBtn');
-                 pauseBtn.textContent = '✅ 完成并导出';
-                 pauseBtn.className = 'btn-primary py-3 text-lg font-semibold';
-                 // togglePause 已经处理了点击逻辑
+                reader.onload = e => {
+                    state.pngBuf = new Uint8Array(e.target.result);
+                    const txt = extractPngText(state.pngBuf);
+                    if (txt) parseData(txt); else toast('无效 PNG', 'error');
+                };
+                reader.readAsArrayBuffer(f);
             }
         }
 
-        function convertTextWithAI(text, apiUrl, apiKey, modelName) {
-            var genderTarget = state.targetGender === 'male' ? '男性' : '女性';
-            var systemPrompt = '你是一位专业的文本编辑专家。任务：将文本中关于"用户/玩家/You/{{user}}"的性别描述转换为' + genderTarget + '。\n原则：\n1. 仅修改User性别相关词(他/她, 哥哥/姐姐, 身体部位等)。\n2. 100%保留原格式、符号、文风。\n3. 识别BG/BL/GL逻辑，处理解剖学术语。\n4. 直接输出修改后文本，无解释。';
-            return fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-                body: JSON.stringify({
-                    model: modelName,
-                    messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: text } ],
-                    temperature: 0.3, max_tokens: 8192
-                })
-            }).then(function(res) {
-                if (!res.ok) {
-                    return res.text().then(function(text) {
-                        try { var json = JSON.parse(text); var msg = (json.error && json.error.message) || text; throw new Error(res.status + ' ' + msg); } catch(e) { throw new Error(res.status + ' ' + res.statusText); }
-                    });
-                }
-                return res.json();
-            }).then(function(json) { return json.choices[0].message.content; });
-        }
-
-        function showDiffPreview() {
-            document.getElementById('diffSection').classList.remove('hidden');
-            var diffContent = document.getElementById('diffContent');
-            diffContent.innerHTML = '';
-            var html = '';
-            
-            var orig = state.originalData.data || state.originalData;
-            var conv = state.convertedData.data || state.convertedData;
-            
-            var fields = [
-                { key: 'description', label: '角色描述' }, { key: 'first_mes', label: '首条消息' },
-                { key: 'scenario', label: '场景设定' }, { key: 'mes_example', label: '对话示例' },
-                { key: 'personality', label: '性格特征' }, { key: 'system_prompt', label: '系统提示词' }
-            ];
-            
-            if (orig.alternate_greetings && Array.isArray(orig.alternate_greetings)) {
-                orig.alternate_greetings.forEach(function(_, i) { fields.push({ key: 'alt', idx: i, label: '备用问候 '+(i+1) }); });
-            }
-            if (orig.character_book && orig.character_book.entries && Array.isArray(orig.character_book.entries)) {
-                orig.character_book.entries.forEach(function(_, i) { fields.push({ key: 'book', idx: i, label: '世界书 '+(i+1) }); });
-            }
-
-            fields.forEach(function(f) {
-                var oTxt = '', cTxt = '';
-                try {
-                    if(f.key === 'alt') { 
-                        oTxt = orig.alternate_greetings && orig.alternate_greetings[f.idx] ? orig.alternate_greetings[f.idx] : ''; 
-                        cTxt = conv.alternate_greetings && conv.alternate_greetings[f.idx] ? conv.alternate_greetings[f.idx] : ''; 
-                    } else if(f.key === 'book') { 
-                        oTxt = orig.character_book.entries[f.idx] ? orig.character_book.entries[f.idx].content : ''; 
-                        cTxt = conv.character_book.entries[f.idx] ? conv.character_book.entries[f.idx].content : ''; 
-                    } else { 
-                        oTxt = orig[f.key] || ''; 
-                        cTxt = conv[f.key] || ''; 
-                    }
-                    
-                    if(oTxt && cTxt && oTxt !== cTxt) {
-                        html += '<div class="field-item block"><div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle(\'open\')"><h3 class="font-medium text-purple-300">'+f.label+'</h3><span class="text-xs text-gray-500">点击展开</span></div><div class="collapsible-content open"><div class="preview-section mt-2 text-sm text-gray-300 whitespace-pre-wrap">'+generateDiff(oTxt, cTxt)+'</div></div></div>';
-                    }
-                } catch(e) { console.error('Diff error', e); }
-            });
-            diffContent.innerHTML = html || '<p class="text-gray-500 text-center">没有检测到内容变更</p>';
-        }
-
-        function generateDiff(oldText, newText) {
-            var oldWords = oldText.split(/(\s+)/), newWords = newText.split(/(\s+)/);
-            var result = '', i = 0, j = 0;
-            while (i < oldWords.length || j < newWords.length) {
-                if (i >= oldWords.length) { result += '<span class="diff-added">'+escapeHtml(newWords[j++])+'</span>'; }
-                else if (j >= newWords.length) { result += '<span class="diff-removed">'+escapeHtml(oldWords[i++])+'</span>'; }
-                else if (oldWords[i] === newWords[j]) { result += escapeHtml(oldWords[i++]); j++; }
-                else {
-                    var nIdx = newWords.indexOf(oldWords[i], j), oIdx = oldWords.indexOf(newWords[j], i);
-                    if (nIdx !== -1 && (oIdx === -1 || nIdx - j < oIdx - i)) { while (j < nIdx) result += '<span class="diff-added">'+escapeHtml(newWords[j++])+'</span>'; }
-                    else if (oIdx !== -1) { while (i < oIdx) result += '<span class="diff-removed">'+escapeHtml(oldWords[i++])+'</span>'; }
-                    else { result += '<span class="diff-removed">'+escapeHtml(oldWords[i++])+'</span><span class="diff-added">'+escapeHtml(newWords[j++])+'</span>'; }
-                }
-            }
-            return result;
-        }
-        function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
-
-        function safeUint8ArrayToString(u8a) {
-            if (typeof TextDecoder !== 'undefined') return new TextDecoder('iso-8859-1').decode(u8a);
-            var res = [], chunk = 0x8000;
-            for (var i=0; i<u8a.length; i+=chunk) res.push(String.fromCharCode.apply(null, u8a.subarray(i, i+chunk)));
-            return res.join('');
-        }
-        function extractCharaFromPNG(buf) {
-            var view = new DataView(buf.buffer), off = 8;
-            while (off < buf.length) {
-                var len = view.getUint32(off), type = String.fromCharCode.apply(null, buf.slice(off+4, off+8));
+        function extractPngText(buf) {
+            const view = new DataView(buf.buffer);
+            let p = 8;
+            while (p < buf.length) {
+                const len = view.getUint32(p);
+                const type = new TextDecoder().decode(buf.slice(p+4, p+8));
                 if (type === 'tEXt' || type === 'iTXt') {
-                    var data = buf.slice(off+8, off+8+len), nullIdx = data.indexOf(0);
-                    var key = String.fromCharCode.apply(null, data.slice(0, nullIdx));
+                    const data = buf.slice(p+8, p+8+len);
+                    let split = data.indexOf(0);
+                    const key = new TextDecoder().decode(data.slice(0, split));
                     if (key === 'chara') {
-                        if (type === 'tEXt') return safeUint8ArrayToString(data.slice(nullIdx+1));
-                        var p = nullIdx+3; while(data[p]) p++; p++; while(data[p]) p++; p++;
-                        return new TextDecoder('utf-8').decode(data.slice(p));
+                        let txt = data.slice(split + (type==='tEXt'?1:2));
+                        if(type === 'iTXt') { let i=0; while(txt[i++]!==0); while(txt[i++]!==0); txt=txt.slice(i); }
+                        return new TextDecoder('utf-8').decode(txt);
                     }
                 }
-                if (type === 'IEND') break; off += 12+len;
+                p += 12 + len;
             }
             return null;
         }
-        function replaceCharaInPNG(buf, b64) {
-            var chunks = [], view = new DataView(buf.buffer), off = 8, inserted = false;
-            chunks.push(buf.slice(0, 8));
-            while (off < buf.length) {
-                var len = view.getUint32(off), type = String.fromCharCode.apply(null, buf.slice(off+4, off+8));
-                if ((type === 'tEXt' || type === 'iTXt') && !inserted) {
-                    var data = buf.slice(off+8, off+8+len), nullIdx = data.indexOf(0);
-                    if (String.fromCharCode.apply(null, data.slice(0, nullIdx)) === 'chara') {
-                        chunks.push(createChunk('tEXt', 'chara', b64)); inserted = true; off += 12+len; continue;
-                    }
-                }
-                if (type === 'IDAT' && !inserted) { chunks.push(createChunk('tEXt', 'chara', b64)); inserted = true; }
-                chunks.push(buf.slice(off, off+12+len)); if (type === 'IEND') break; off += 12+len;
-            }
-            var total = chunks.reduce((s, c) => s+c.length, 0), res = new Uint8Array(total), p = 0;
-            chunks.forEach(c => { res.set(c, p); p += c.length; });
-            return res;
-        }
-        function createChunk(type, key, val) {
-            var k = new TextEncoder().encode(key), v = new TextEncoder().encode(val);
-            var len = k.length + 1 + v.length, buf = new Uint8Array(12 + len), view = new DataView(buf.buffer);
-            view.setUint32(0, len); buf.set(new TextEncoder().encode(type), 4);
-            buf.set(k, 8); buf[8+k.length] = 0; buf.set(v, 9+k.length);
-            var crc = 0xFFFFFFFF, table = new Uint32Array(256);
-            for(var i=0; i<256; i++) { var c=i; for(var j=0; j<8; j++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); table[i]=c; }
-            for(var i=4; i<8+len; i++) crc = (crc>>>8)^table[(crc^buf[i])&0xFF];
-            view.setUint32(8+len, (crc^0xFFFFFFFF)>>>0);
-            return buf;
+
+        function parseData(str) {
+            try {
+                try { state.orig = JSON.parse(str); } catch { state.orig = JSON.parse(atob(str)); }
+                
+                // 预扫描
+                state.tasks = deepScan(state.orig);
+                
+                const name = state.orig.data?.name || state.orig.name || '未知角色';
+                document.getElementById('fileInfo').innerHTML = `<div class="text-xl">📄</div><div class="font-bold">${name}</div>`;
+                
+                // 显示扫描报告
+                const report = document.getElementById('scanDetails');
+                const counts = { core: 0, book: 0, alt: 0 };
+                state.tasks.forEach(t => {
+                    if (t.path[0] === 'character_book') counts.book++;
+                    else if (t.path[0].includes('greetings')) counts.alt++;
+                    else counts.core++;
+                });
+                report.innerText = `发现 \({state.tasks.length} 个任务：基础字段 \){counts.core} | 问候语 \({counts.alt} | 世界书 \){counts.book}`;
+                document.getElementById('scanReport').classList.remove('hidden');
+
+                checkStart();
+                toast('解析成功', 'success');
+            } catch(e) { console.error(e); toast('格式错误', 'error'); }
         }
 
-        function exportJSON() {
-            var name = state.originalFileName + '_' + (state.targetGender==='male'?'Male':'Female') + '_User.json';
-            download(new Blob([JSON.stringify(state.convertedData, null, 2)], {type:'application/json'}), name);
+        function checkStart() {
+            const ready = state.orig && !document.getElementById('modelSelect').disabled;
+            const btn = document.getElementById('startBtn');
+            if (ready) { btn.classList.remove('hidden'); btn.disabled = false; } else { btn.classList.add('hidden'); }
         }
-        function exportPNG() {
-            if (!state.originalPngBuffer) return showToast('原始PNG无效', 'error');
-            var b64 = btoa(unescape(encodeURIComponent(JSON.stringify(state.convertedData))));
-            var name = state.originalFileName + '_' + (state.targetGender==='male'?'Male':'Female') + '_User.png';
-            download(new Blob([replaceCharaInPNG(state.originalPngBuffer, b64)], {type:'image/png'}), name);
+
+        // --- 转换 ---
+        function start() {
+            document.getElementById('startBtn').classList.add('hidden');
+            document.getElementById('controlPanel').classList.remove('hidden');
+            document.getElementById('progressArea').classList.remove('hidden');
+            document.getElementById('exportArea').classList.add('hidden');
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('retryBtn').classList.add('hidden');
+
+            state.conv = JSON.parse(JSON.stringify(state.orig));
+            // 重新生成任务列表，绑定到 conv 对象
+            state.tasks = deepScan(state.conv); 
+            
+            state.total = state.tasks.length;
+            state.done = 0;
+            state.active = 0;
+            state.paused = false;
+            
+            renderLog();
+            processQueue();
         }
-        function download(blob, name) {
-            var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+
+        function renderLog() {
+            const log = document.getElementById('log');
+            log.innerHTML = state.tasks.map((t, i) => `
+                <div id="task-${i}" class="flex items-center justify-between p-1 hover:bg-white/5 rounded">
+                    <div class="flex items-center gap-2 truncate w-full">
+                        <span class="status-dot pending flex-shrink-0"></span>
+                        <span class="truncate text-gray-300 text-[10px]">${t.name}</span>
+                        <span class="tag">${t.path[0]==='character_book'?'世界书':(t.path[0].includes('greetings')?'问候':'基础')}</span>
+                    </div>
+                    <span class="text-[10px] opacity-50 ml-2 error-msg text-red-400"></span>
+                </div>
+            `).join('');
         }
+
+        function updateStatus(idx, status, msg='') {
+            state.tasks[idx].status = status;
+            const el = document.getElementById(`task-${idx}`);
+            if (el) {
+                el.querySelector('.status-dot').className = `status-dot ${status}`;
+                if (msg) el.querySelector('.error-msg').innerText = msg;
+            }
+            const pct = (state.done / state.total) * 100;
+            document.getElementById('bar').style.width = `${pct}%`;
+            document.getElementById('progressText').innerText = `\({state.done}/\){state.total}`;
+            if (state.done === state.total) finish();
+        }
+
+        function processQueue() {
+            if (state.paused) return;
+            if (state.done === state.total) { finish(); return; }
+            const pending = state.tasks.filter(t => t.status === 'pending');
+            while (state.active < 5 && pending.length > 0 && !state.paused) {
+                const task = pending.shift();
+                const idx = state.tasks.indexOf(task);
+                runTask(task, idx);
+            }
+        }
+
+        async function runTask(task, idx) {
+            state.active++;
+            updateStatus(idx, 'processing');
+            
+            let url = document.getElementById('apiUrl').value.replace(/\/$/, '');
+            if (!url.endsWith('/chat/completions')) url += '/chat/completions';
+            
+            const key = document.getElementById('apiKey').value;
+            const model = document.getElementById('modelSelect').value;
+            const target = state.gender === 'male' ? '男性' : '女性';
+            
+            const prompt = `你是一个专业的语义重构引擎。
+任务：修改文本，将其中【属于用户({{user}})】的性别特征修改为【${target}】。
+
+⚠️ 核心逻辑：
+1. **实体追踪**：分析文中的代词（他/她/它）和名词，判断是指代角色({{char}})还是用户({{user}})。只修改指代用户的部分。
+2. **解剖学适配**：
+   - 若目标为男：将指代用户的“乳房/花穴/湿了”等，根据动作逻辑修改为男性的“胸肌/后穴/肠液/前列腺液”或“阴茎/勃起”。
+   - 若目标为女：将指代用户的男性特征修改为女性对应器官。
+   - 必须修改，不要回避敏感词。
+3. **风格保留**：严禁修改标点、格式、Markdown。不改剧情。
+4. **输出**：直接输出修改后的完整文本。`;
+
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+                    body: JSON.stringify({
+                        model: model,
+                        messages: [ { role: 'system', content: prompt }, { role: 'user', content: task.val } ],
+                        temperature: 0.3, max_tokens: 8192
+                    })
+                });
+
+                if (!res.ok) {
+                    const txt = await res.text();
+                    let errMsg = res.status;
+                    try { errMsg += ' ' + JSON.parse(txt).error.message; } catch {}
+                    throw new Error(errMsg);
+                }
+                
+                const json = await res.json();
+                const newText = json.choices[0].message.content;
+
+                // Update Data Logic
+                let ptr = state.conv.data || state.conv;
+                // Special handling for character_book which might be at root or inside data
+                if (task.path[0] === 'character_book' && !ptr.character_book && state.conv.character_book) {
+                    ptr = state.conv; // Switch to root if book is at root
+                }
+
+                for (let i = 0; i < task.path.length - 1; i++) {
+                    if (ptr[task.path[i]]) ptr = ptr[task.path[i]];
+                }
+                ptr[task.path[task.path.length - 1]] = newText;
+
+                updateStatus(idx, 'done');
+            } catch (e) {
+                console.error(e);
+                updateStatus(idx, 'error', e.message);
+            } finally {
+                state.active--;
+                state.done++;
+                processQueue();
+            }
+        }
+
+        function togglePause() {
+            if (state.done === state.total && state.total > 0) { finish(); return; }
+            state.paused = !state.paused;
+            const btn = document.getElementById('pauseBtn');
+            btn.innerText = state.paused ? '▶️ 继续' : '⏸️ 暂停';
+            btn.className = state.paused ? 'glass-input p-3 font-bold bg-blue-500/20 text-blue-300' : 'glass-input p-3 font-bold';
+            if (!state.paused) processQueue();
+        }
+
+        function retryFailed() {
+            state.tasks.forEach((t, i) => {
+                if (t.status === 'error') { t.status = 'pending'; state.done--; updateStatus(i, 'pending', ''); }
+            });
+            document.getElementById('retryBtn').classList.add('hidden');
+            state.paused = false;
+            processQueue();
+        }
+
+        function finish() {
+            document.getElementById('statusText').innerText = '处理完成';
+            document.getElementById('controlPanel').classList.add('hidden');
+            document.getElementById('exportArea').classList.remove('hidden');
+            
+            const errors = state.tasks.filter(t => t.status === 'error').length;
+            if (errors > 0) {
+                document.getElementById('controlPanel').classList.remove('hidden');
+                document.getElementById('retryBtn').classList.remove('hidden');
+                document.getElementById('pauseBtn').classList.add('hidden');
+                toast(`${errors} 个项目失败`, 'error');
+            } else {
+                const startBtn = document.getElementById('startBtn');
+                startBtn.innerText = '✅ 转换成功 (点击刷新)';
+                startBtn.classList.remove('hidden'); startBtn.disabled = false;
+                startBtn.onclick = () => location.reload();
+                toast('全部完成！', 'success');
+            }
+            
+            if (!document.getElementById('controlPanel').classList.contains('hidden')) {
+                 const pauseBtn = document.getElementById('pauseBtn');
+                 pauseBtn.innerText = '✅ 完成并导出';
+                 pauseBtn.className = 'btn-primary p-3 font-bold';
+            }
+
+            // Diff Preview
+            let diffHtml = '';
+            state.tasks.forEach((t, i) => {
+                let ptr = state.conv.data || state.conv;
+                if (t.path[0] === 'character_book' && !ptr.character_book && state.conv.character_book) ptr = state.conv;
+                for (let k = 0; k < t.path.length - 1; k++) ptr = ptr[t.path[k]];
+                const newVal = ptr[t.path[t.path.length - 1]];
+
+                if (t.status === 'done' && t.val !== newVal) {
+                    diffHtml += `\n=== \({t.name} ===\n[原]: \){t.val.substring(0, 60)}...\n[新]: ${newVal.substring(0, 60)}...\n`;
+                }
+            });
+            document.getElementById('diffBox').innerText = diffHtml || '内容无变化';
+        }
+
+        function exportFile(type) {
+            const suffix = state.gender === 'male' ? 'MaleUser' : 'FemaleUser';
+            const name = `\({state.fname}_\){suffix}.${type}`;
+            if (type === 'json') {
+                const blob = new Blob([JSON.stringify(state.conv, null, 2)], {type: 'application/json'});
+                save(blob, name);
+            } else {
+                if (!state.pngBuf) return toast('原图丢失', 'error');
+                const str = JSON.stringify(state.conv);
+                const b64 = btoa(unescape(encodeURIComponent(str)));
+                const newBuf = packPng(state.pngBuf, b64);
+                const blob = new Blob([newBuf], {type: 'image/png'});
+                save(blob, name);
+            }
+        }
+
+        function save(blob, name) {
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+        }
+
+        function packPng(buf, text) {
+            const chunks = []; let p = 8; chunks.push(buf.slice(0, 8));
+            let charaInserted = false;
+            const makeChunk = (t, d) => {
+                const len = d.length; const b = new Uint8Array(12 + len);
+                new DataView(b.buffer).setUint32(0, len); b.set(new TextEncoder().encode(t), 4); b.set(d, 8);
+                const crc = calcCrc(b.slice(4, 8+len)); new DataView(b.buffer).setUint32(8+len, crc); return b;
+            };
+            while (p < buf.length) {
+                const len = new DataView(buf.buffer).getUint32(p);
+                const type = new TextDecoder().decode(buf.slice(p+4, p+8));
+                if (type === 'IEND') {
+                    if (!charaInserted) {
+                        const key = new TextEncoder().encode('chara'); const val = new TextEncoder().encode(text);
+                        const d = new Uint8Array(key.length + 1 + val.length); d.set(key); d[key.length] = 0; d.set(val, key.length+1);
+                        chunks.push(makeChunk('tEXt', d));
+                    }
+                    chunks.push(buf.slice(p, p+12)); break;
+                }
+                if (type === 'tEXt' || type === 'iTXt') {
+                    const d = buf.slice(p+8, p+8+len); const kEnd = d.indexOf(0);
+                    const k = new TextDecoder().decode(d.slice(0, kEnd));
+                    if (k === 'chara') {
+                        const key = new TextEncoder().encode('chara'); const val = new TextEncoder().encode(text);
+                        const data = new Uint8Array(key.length + 1 + val.length); data.set(key); data[key.length] = 0; data.set(val, key.length+1);
+                        chunks.push(makeChunk('tEXt', data)); charaInserted = true; p += 12 + len; continue;
+                    }
+                }
+                chunks.push(buf.slice(p, p+12+len)); p += 12 + len;
+            }
+            const total = chunks.reduce((a,c)=>a+c.length,0); const res = new Uint8Array(total);
+            let off = 0; chunks.forEach(c => { res.set(c, off); off += c.length; }); return res;
+        }
+
+        const crcTable = [];
+        for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? 0xedb88320 ^ (c >>> 1) : c >>> 1; crcTable[n] = c; }
+        function calcCrc(buf) { let c = 0xffffffff; for (let i = 0; i < buf.length; i++) c = crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8); return c ^ 0xffffffff; }
     </script>
 </body>
 </html>
