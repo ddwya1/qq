@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡重构台 (格式完美版)</title>
+    <title>角色卡重构台 (格式强制修复版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* 基础设置 */
@@ -43,11 +43,10 @@
         .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
         .card-header { background: #27272a; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #a1a1aa; display: flex; justify-content: space-between; }
         
-        /* 核心修复：强制保留格式，解决挤成一坨的问题 */
+        /* 核心修复：强制保留格式 */
         .text-content {
             background: #09090b; color: #d4d4d8; padding: 14px; 
             font-family: monospace; font-size: 13px; line-height: 1.6;
-            /* 关键：保留换行和空格 */
             white-space: pre-wrap; 
             word-wrap: break-word;
             border-top: 1px solid #27272a;
@@ -201,24 +200,18 @@
             var target = gender === 'male' ? '男性' : '女性';
             var avoid = gender === 'male' ? '她' : '他';
             var want = gender === 'male' ? '他' : '她';
-            var anatomy = gender === 'male' ? '男性器官(如阴茎/后穴/前列腺)' : '女性器官(如阴道/乳房)';
 
-            // 增强版 Prompt：包含格式保留指令 + BL/NSFW 逻辑
+            // 升级版 Prompt：专门针对 XML 标签保护
             var prompt = 
-                "你是一个专业的【角色卡重构专家】。\n" +
-                "【任务目标】：\n" +
-                "1. 将文中针对【User/用户】的描写改为【" + target + "】。\n" +
-                "2. 替换代词：将指代User的“" + avoid + "”改为“" + want + "”。\n" +
-                "3. 【生理/NSFW重构】：\n" +
-                "   - 识别User的新性别为" + target + "。\n" +
-                "   - 如果涉及色情/互动描写，必须修改器官和动作以符合解剖学逻辑。\n" +
-                "   - 例如：若转为男性，将“花穴/湿了”改为“后穴/肠液/勃起”；若转为女性则反之。\n" +
-                "   - 保持原文的色情程度，不要和谐，但要符合新性别。\n" +
-                "【严格格式要求】：\n" +
-                "1. ⚠️ 严禁删除换行符！严禁合并段落！\n" +
-                "2. 必须保留原文的 XML 标签（如 <character_information>）、列表符号、缩进。\n" +
-                "3. 不要修改 {{user}} 和 {{char}} 占位符本身，只修改周围的描述。\n" +
-                "4. 只输出修改后的正文，不要任何解释。";
+                "你是一个【严格格式保留】的文本替换工具。\n" +
+                "【任务】：\n" +
+                "1. 将指代User的词汇改为【" + target + "】，代词【" + avoid + "】改为【" + want + "】。\n" +
+                "2. 【NSFW/生理重构】：根据User新性别(" + target + ")修改器官和动作描写（如将女性特征改为男性特征，反之亦然）。\n" +
+                "【格式死命令】：\n" +
+                "1. ⚠️ 严禁把多行文本合并为一行！\n" +
+                "2. ⚠️ 遇到 XML 标签（如 <衣着> <方位>），必须保留其前后的换行符！\n" +
+                "3. 绝对不要把 </标签><标签> 连在一起，必须换行！\n" +
+                "4. 保持原文的列表结构。";
 
             var count = 0;
             for (var i = 0; i < blocks.length; i++) {
@@ -238,6 +231,12 @@
                     if (shouldStop) { block.parentElement.style.opacity = '1'; alert('已停止'); break; }
 
                     if (newTxt && newTxt !== txt) {
+                        // 【核心修复】：JS 强制格式化
+                        // 1. 强制在 >< 之间换行（解决 XML 标签粘连）
+                        newTxt = newTxt.replace(/>\s*</g, ">\n<");
+                        // 2. 强制在句号后接标签时换行
+                        newTxt = newTxt.replace(/([。！？])\s*(<)/g, "\(1\n\)2");
+                        
                         block.textContent = newTxt;
                         block.classList.add('highlight-change');
                         (function(el) {
@@ -281,8 +280,8 @@
 
             var json = await res.json();
             if (json.choices && json.choices.length > 0) {
-                // 移除可能存在的 Markdown 代码块包裹
                 var content = json.choices[0].message.content;
+                // 清理 Markdown 代码块包裹
                 content = content.replace(/^```.*\n/g, '').replace(/\n```$/g, '');
                 return content;
             }
