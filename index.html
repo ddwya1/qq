@@ -495,12 +495,12 @@
         // ==================== Toast 通知 ====================
         function showToast(message, type = 'info', duration = 3000) {
             const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
+            toast.className = 'toast ' + type;
             toast.textContent = message;
             document.body.appendChild(toast);
-            setTimeout(() => {
+            setTimeout(function() {
                 toast.style.animation = 'slideIn 0.3s ease reverse';
-                setTimeout(() => toast.remove(), 300);
+                setTimeout(function() { toast.remove(); }, 300);
             }, duration);
         }
 
@@ -544,30 +544,31 @@
             try {
                 // 构建 models endpoint
                 const baseUrl = apiUrl.replace(/\/chat\/completions\(/, '').replace(/\/\)/, '');
-                const modelsUrl = `${baseUrl}/models`;
+                const modelsUrl = baseUrl + '/models';
                 
                 const response = await fetch(modelsUrl, {
                     method: 'GET',
                     headers: {
-                        'Authorization': `Bearer ${apiKey}`,
+                        'Authorization': 'Bearer ' + apiKey,
                         'Content-Type': 'application/json'
                     }
                 });
                 
                 if (!response.ok) {
-                    throw new Error(`API 请求失败: \({response.status} \){response.statusText}`);
+                    throw new Error('API 请求失败: ' + response.status + ' ' + response.statusText);
                 }
                 
                 const data = await response.json();
+                
+                console.log('API 返回数据:', data); // 调试用
                 
                 if (!data.data || !Array.isArray(data.data)) {
                     throw new Error('API 返回格式不正确');
                 }
                 
                 availableModels = data.data
-                    .filter(m => m.id) // 确保有 id
-                    .sort((a, b) => {
-                        // 优先显示包含 chat 的模型
+                    .filter(function(m) { return m.id; })
+                    .sort(function(a, b) {
                         const aIsChat = a.id.toLowerCase().includes('chat');
                         const bIsChat = b.id.toLowerCase().includes('chat');
                         if (aIsChat && !bIsChat) return -1;
@@ -579,17 +580,27 @@
                     throw new Error('未找到可用模型');
                 }
                 
-                // 填充下拉框
+                // 填充下拉框 - 使用 DOM 方法而不是模板字符串
                 const select = document.getElementById('modelSelect');
-                select.innerHTML = availableModels.map(m => 
-                    `<option value="\({m.id}">\){m.id}</option>`
-                ).join('');
+                select.innerHTML = ''; // 清空
+                
+                for (let i = 0; i < availableModels.length; i++) {
+                    const model = availableModels[i];
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = model.id;
+                    select.appendChild(option);
+                }
+                
                 select.disabled = false;
                 
                 // 自动选择第一个
-                select.value = availableModels[0].id;
+                if (availableModels.length > 0) {
+                    select.value = availableModels[0].id;
+                }
                 
-                showToast(`成功加载 ${availableModels.length} 个模型`, 'success');
+                showToast('成功加载 ' + availableModels.length + ' 个模型', 'success');
+                updateConvertButtonState();
                 
             } catch (error) {
                 console.error('加载模型失败:', error);
@@ -604,16 +615,16 @@
         // ==================== 文件拖放 ====================
         const dropZone = document.getElementById('dropZone');
         
-        dropZone.addEventListener('dragover', (e) => {
+        dropZone.addEventListener('dragover', function(e) {
             e.preventDefault();
             dropZone.classList.add('dragover');
         });
         
-        dropZone.addEventListener('dragleave', () => {
+        dropZone.addEventListener('dragleave', function() {
             dropZone.classList.remove('dragover');
         });
         
-        dropZone.addEventListener('drop', (e) => {
+        dropZone.addEventListener('drop', function(e) {
             e.preventDefault();
             dropZone.classList.remove('dragover');
             const file = e.dataTransfer.files[0];
@@ -679,7 +690,7 @@
             while (offset < buffer.length) {
                 const length = view.getUint32(offset);
                 const typeBytes = buffer.slice(offset + 4, offset + 8);
-                const type = String.fromCharCode(...typeBytes);
+                const type = String.fromCharCode.apply(null, typeBytes);
                 
                 if (type === 'tEXt' || type === 'iTXt') {
                     const data = buffer.slice(offset + 8, offset + 8 + length);
@@ -705,11 +716,11 @@
             let nullIndex = data.indexOf(0);
             if (nullIndex === -1) return null;
             
-            const keyword = String.fromCharCode(...data.slice(0, nullIndex));
+            const keyword = String.fromCharCode.apply(null, data.slice(0, nullIndex));
             
             if (type === 'tEXt') {
-                const text = String.fromCharCode(...data.slice(nullIndex + 1));
-                return { keyword, text };
+                const text = String.fromCharCode.apply(null, data.slice(nullIndex + 1));
+                return { keyword: keyword, text: text };
             } else if (type === 'iTXt') {
                 let pos = nullIndex + 1;
                 const compressionFlag = data[pos];
@@ -724,7 +735,7 @@
                 
                 const textBytes = data.slice(pos);
                 const text = new TextDecoder('utf-8').decode(textBytes);
-                return { keyword, text };
+                return { keyword: keyword, text: text };
             }
             
             return null;
@@ -745,13 +756,14 @@
             
             const data = originalData.data || originalData;
             document.getElementById('cardName').textContent = data.name || '未知角色';
-            document.getElementById('cardCreator').textContent = data.creator ? `by ${data.creator}` : '';
+            document.getElementById('cardCreator').textContent = data.creator ? 'by ' + data.creator : '';
             
-            const spec = originalData.spec || 'V1';
+            const
+spec = originalData.spec || 'V1';
             const version = originalData.spec_version || '1.0';
-            document.getElementById('cardSpec').textContent = `\({spec} v\){version}`;
+            document.getElementById('cardSpec').textContent = spec + ' v' + version;
             document.getElementById('cardVersion').textContent = 
-                data.character_version ? `角色版本: ${data.character_version}` : '';
+                data.character_version ? '角色版本: ' + data.character_version : '';
         }
 
         // ==================== 更新转换按钮状态 ====================
@@ -782,8 +794,7 @@
             
             document.getElementById('convertBtn').disabled = true;
             document.getElementById('progressSection').classList.remove('hidden');
-            document.getElementById('diffSection').classList.ad
-d('hidden');
+            document.getElementById('diffSection').classList.add('hidden');
             document.getElementById('exportSection').classList.add('hidden');
             
             try {
@@ -804,28 +815,31 @@ d('hidden');
                 // 处理 alternate_greetings
                 const altGreetings = data.alternate_greetings || [];
                 for (let i = 0; i < altGreetings.length; i++) {
-                    fields.push({ key: `alternate_greetings[\({i}]`, label: `备用问候 \){i + 1}`, isAlt: true, index: i });
+                    fields.push({ key: 'alternate_greetings[' + i + ']', label: '备用问候 ' + (i + 1), isAlt: true, index: i });
                 }
                 
                 // 过滤空字段
-                const validFields = fields.filter(f => {
+                const validFields = fields.filter(function(f) {
                     if (f.isAlt) return altGreetings[f.index] && altGreetings[f.index].trim();
                     return data[f.key] && data[f.key].trim();
                 });
                 
                 // 创建进度显示
                 const fieldProgress = document.getElementById('fieldProgress');
-                fieldProgress.innerHTML = validFields.map(f => `
-                    <div class="flex items-center text-sm" id="field-${f.key.replace(/[\[\]]/g, '-')}">
-                        <span class="status-indicator pending"></span>
-                        <span class="text-gray-400">${f.label}</span>
-                    </div>
-                `).join('');
+                fieldProgress.innerHTML = '';
+                for (let i = 0; i < validFields.length; i++) {
+                    const f = validFields[i];
+                    const div = document.createElement('div');
+                    div.className = 'flex items-center text-sm';
+                    div.id = 'field-' + f.key.replace(/[\[\]]/g, '-');
+                    div.innerHTML = '<span class="status-indicator pending"></span><span class="text-gray-400">' + f.label + '</span>';
+                    fieldProgress.appendChild(div);
+                }
                 
                 // 逐个处理字段
                 for (let i = 0; i < validFields.length; i++) {
                     const field = validFields[i];
-                    const fieldId = `field-${field.key.replace(/[\[\]]/g, '-')}`;
+                    const fieldId = 'field-' + field.key.replace(/[\[\]]/g, '-');
                     const fieldEl = document.getElementById(fieldId);
                     
                     // 更新状态为处理中
@@ -833,7 +847,7 @@ d('hidden');
                     
                     const progress = Math.round(((i + 0.5) / validFields.length) * 100);
                     document.getElementById('progressBar').style.width = progress + '%';
-                    document.getElementById('progressStatus').textContent = `正在处理: ${field.label}...`;
+                    document.getElementById('progressStatus').textContent = '正在处理: ' + field.label + '...';
                     
                     try {
                         let originalText;
@@ -853,9 +867,12 @@ d('hidden');
                         
                         fieldEl.querySelector('.status-indicator').className = 'status-indicator done';
                     } catch (error) {
-                        console.error(`处理 ${field.label} 失败:`, error);
+                        console.error('处理 ' + field.label + ' 失败:', error);
                         fieldEl.querySelector('.status-indicator').className = 'status-indicator error';
-                        fieldEl.innerHTML += `<span class="text-red-400 ml-2 text-xs">${error.message}</span>`;
+                        const errorSpan = document.createElement('span');
+                        errorSpan.className = 'text-red-400 ml-2 text-xs';
+                        errorSpan.textContent = error.message;
+                        fieldEl.appendChild(errorSpan);
                     }
                     
                     const finalProgress = Math.round(((i + 1) / validFields.length) * 100);
@@ -884,46 +901,13 @@ d('hidden');
             const genderTarget = targetGender === 'male' ? '男性' : '女性';
             const genderOpposite = targetGender === 'male' ? '女性' : '男性';
             
-            const systemPrompt = `你是一位专业的文本编辑专家，专门从事角色扮演游戏内容的本地化和改编工作。你的任务是将文本中关于"用户/玩家/You/{{user}}"的性别相关描述转换为目标性别。
-
-## 工作原则
-
-### 1.‌ 外科手术式精准修改
-- 仅修改与 User（用户/玩家/你/{{user}}）性别直接相关的词汇和描述
-- 100% 保留原文的文风、语气、格式、标点符号
-- 不改变角色(char/{{char}})的任何属性
-- 不添加原文没有的内容，不删除与性别无关的内容
-
-### 2.‌ 需要转换的内容类型
-- 人称代词：她→他、她的→他的（或反向）
-- 称呼：小姐→先生、女士→男士、姐姐→哥哥（或反向）
-- 身体特征描述：胸部→胸膛、阴道→阴茎/后穴、子宫→前列腺等
-- 生理反应：淫水→前列腺液/肠液、潮吹→射精等
-- 服装描述：裙子→裤子、胸罩→无（根据上下文调整）
-
-### 3.‌ 关系逻辑识别
-- BG（男女）模式：正常转换性别词汇
-- BL（男男）模式：如果角色是男性且User转为男性，需将女性器官描写转为男性器官（后穴、肠液等）
-- GL（女女）模式：如果角色是女性且User转为女性，保持女性器官描写
-
-### 4.‌ 学术化处理
-- 将所有身体部位和生理现象视为医学/解剖学术语进行专业处理
-- 保持文学性的同时确保准确性
-
-## 目标性别
-将 User 转换为：${genderTarget}
-
-## 输出要求
-- 直接输出修改后的完整文本
-- 不要添加任何解释、注释或说明
-- 不要使用 markdown 格式包裹
-- 保持原文的所有格式（换行、空格等）`;
+            const systemPrompt = '你是一位专业的文本编辑专家，专门从事角色扮演游戏内容的本地化和改编工作。你的任务是将文本中关于"用户/玩家/You/{{user}}"的性别相关描述转换为目标性别。\n\n## 工作原则\n\n### 1. 外科手术式精准修改\n- 仅修改与 User（用户/玩家/你/{{user}}）性别直接相关的词汇和描述\n- 100% 保留原文的文风、语气、格式、标点符号\n- 不改变角色(char/{{char}})的任何属性\n- 不添加原文没有的内容，不删除与性别无关的内容\n\n### 2. 需要转换的内容类型\n- 人称代词：她→他、她的→他的（或反向）\n- 称呼：小姐→先生、女士→男士、姐姐→哥哥（或反向）\n- 身体特征描述：胸部→胸膛、阴道→阴茎/后穴、子宫→前列腺等\n- 生理反应：淫水→前列腺液/肠液、潮吹→射精等\n- 服装描述：裙子→裤子、胸罩→无（根据上下文调整）\n\n### 3. 关系逻辑识别\n- BG（男女）模式：正常转换性别词汇\n- BL（男男）模式：如果角色是男性且User转为男性，需将女性器官描写转为男性器官（后穴、肠液等）\n- GL（女女）模式：如果角色是女性且User转为女性，保持女性器官描写\n\n### 4. 学术化处理\n- 将所有身体部位和生理现象视为医学/解剖学术语进行专业处理\n- 保持文学性的同时确保准确性\n\n## 目标性别\n将 User 转换为：' + genderTarget + '\n\n## 输出要求\n- 直接输出修改后的完整文本\n- 不要添加任何解释、注释或说明\n- 不要使用 markdown 格式包裹\n- 保持原文的所有格式（换行、空格等）';
 
             const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${apiKey}`
+                    'Authorization': 'Bearer ' + apiKey
                 },
                 body: JSON.stringify({
                     model: modelName,
@@ -938,7 +922,7 @@ d('hidden');
             
             if (!response.ok) {
                 const error = await response.text();
-                throw new Error(`API 请求失败: ${response.status}`);
+                throw new Error('API 请求失败: ' + response.status);
             }
             
             const result = await response.json();
@@ -965,17 +949,18 @@ d('hidden');
             // 添加 alternate_greetings
             const altGreetings = origData.alternate_greetings || [];
             for (let i = 0; i < altGreetings.length; i++) {
-                fields.push({ key: `alternate_greetings`, label: `备用问候 ${i + 1}`, index: i });
+                fields.push({ key: 'alternate_greetings', label: '备用问候 ' + (i + 1), index: i });
             }
             
             let html = '';
             
-            for (const field of fields) {
+            for (let fi = 0; fi < fields.length; fi++) {
+                const field = fields[fi];
                 let origText, convText;
                 
                 if (field.index !== undefined) {
-                    origText = origData.alternate_greetings?.[field.index] || '';
-                    convText = convData.alternate_greetings?.[field.index] || '';
+                    origText = (origData.alternate_greetings && origData.alternate_greetings[field.index]) || '';
+                    convText = (convData.alternate_greetings && convData.alternate_greetings[field.index]) || '';
                 } else {
                     origText = origData[field.key] || '';
                     convText = convData[field.key] || '';
@@ -986,19 +971,7 @@ d('hidden');
                 
                 const diffHtml = generateDiff(origText, convText);
                 
-                html += `
-                    <div class="field-item">
-                        <div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle('open'); this.querySelector('.chevron').classList.toggle('open')">
-                            <h3 class="font-medium text-purple-300">${field.label}</h3>
-                            <span class="chevron text-gray-500">▼</span>
-                        </div>
-                        <div class="collapsible-content open">
-                            <div class="preview-section mt-3 text-sm text-gray-300 whitespace-pre-wrap break-words">
-                                ${diffHtml}
-                            </div>
-                        </div>
-                    </div>
-                `;
+                html += '<div class="field-item"><div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle(\'open\'); this.querySelector(\'.chevron\').classList.toggle(\'open\')"><h3 class="font-medium text-purple-300">' + field.label + '</h3><span class="chevron text-gray-500">▼</span></div><div class="collapsible-content open"><div class="preview-section mt-3 text-sm text-gray-300 whitespace-pre-wrap break-words">' + diffHtml + '</div></div></div>';
             }
             
             diffContent.innerHTML = html || '<p class="text-gray-500 text-center">没有检测到变更</p>';
@@ -1015,10 +988,10 @@ d('hidden');
             
             while (i < oldWords.length || j < newWords.length) {
                 if (i >= oldWords.length) {
-                    result += `<span class="diff-added">${escapeHtml(newWords[j])}</span>`;
+                    result += '<span class="diff-added">' + escapeHtml(newWords[j]) + '</span>';
                     j++;
                 } else if (j >= newWords.length) {
-                    result += `<span class="diff-removed">${escapeHtml(oldWords[i])}</span>`;
+                    result += '<span class="diff-removed">' + escapeHtml(oldWords[i]) + '</span>';
                     i++;
                 } else if (oldWords[i] === newWords[j]) {
                     result += escapeHtml(oldWords[i]);
@@ -1032,19 +1005,19 @@ d('hidden');
                     if (foundInNew !== -1 && (foundInOld === -1 || foundInNew - j < foundInOld - i)) {
                         // 新文本有插入
                         while (j < foundInNew) {
-                            result += `<span class="diff-added">${escapeHtml(newWords[j])}</span>`;
+                            result += '<span class="diff-added">' + escapeHtml(newWords[j]) + '</span>';
                             j++;
                         }
                     } else if (foundInOld !== -1) {
                         // 旧文本有删除
                         while (i < foundInOld) {
-                            result += `<span class="diff-removed">${escapeHtml(oldWords[i])}</span>`;
+                            result += '<span class="diff-removed">' + escapeHtml(oldWords[i]) + '</span>';
                             i++;
                         }
                     } else {
                         // 替换
-                        result += `<span class="diff-removed">${escapeHtml(oldWords[i])}</span>`;
-                        result += `<span class="diff-added">${escapeHtml(newWords[j])}</span>`;
+                        result += '<span class="diff-removed">' + escapeHtml(oldWords[i]) + '</span>';
+                        result += '<span class="diff-added">' + escapeHtml(newWords[j]) + '</span>';
                         i++;
                         j++;
                     }
@@ -1068,7 +1041,7 @@ d('hidden');
             }
             
             const genderSuffix = targetGender === 'male' ? 'Male_User' : 'Female_User';
-            const fileName = `\({originalFileName}_\){genderSuffix}.json`;
+            const fileName = originalFileName + '_' + genderSuffix + '.json';
             
             const blob = new Blob([JSON.stringify(convertedData, null, 2)], { type: 'application/json' });
             downloadBlob(blob, fileName);
@@ -1093,7 +1066,7 @@ d('hidden');
                 const newPngBuffer = replaceCharaInPNG(originalPngBuffer, charaBase64);
                 
                 const genderSuffix = targetGender === 'male' ? 'Male_User' : 'Female_User';
-                const fileName = `\({originalFileName}_\){genderSuffix}.png`;
+                const fileName = originalFileName + '_' + genderSuffix + '.png';
                 
                 const blob = new Blob([newPngBuffer], { type: 'image/png' });
                 downloadBlob(blob, fileName);
@@ -1117,13 +1090,13 @@ d('hidden');
             while (offset < buffer.length) {
                 const length = view.getUint32(offset);
                 const typeBytes = buffer.slice(offset + 4, offset + 8);
-                const type = String.fromCharCode(...typeBytes);
+                const type = String.fromCharCode.apply(null, typeBytes);
                 const chunkData = buffer.slice(offset, offset + 12 + length);
                 
                 if ((type === 'tEXt' || type === 'iTXt') && !insertedChara) {
                     const data = buffer.slice(offset + 8, offset + 8 + length);
                     let nullIndex = data.indexOf(0);
-                    const keyword = String.fromCharCode(...data.slice(0, nullIndex));
+                    const keyword = String.fromCharCode.apply(null, data.slice(0, nullIndex));
                     
                     if (keyword === 'chara') {
                         // 替换这个 chunk
@@ -1150,12 +1123,12 @@ d('hidden');
             }
             
             // 合并所有 chunks
-            const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+            const totalLength = chunks.reduce(function(sum, chunk) { return sum + chunk.length; }, 0);
             const result = new Uint8Array(totalLength);
             let pos = 0;
-            for (const chunk of chunks) {
-                result.set(chunk, pos);
-                pos += chunk.length;
+            for (let i = 0; i < chunks.length; i++) {
+                result.set(chunks[i], pos);
+                pos += chunks[i].length;
             }
             
             return result;
