@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SillyTavern 角色卡性别转换工具 (Pro)</title>
+    <title>SillyTavern 角色卡性别转换工具 (修复版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * { -webkit-tap-highlight-color: transparent; }
@@ -45,8 +45,8 @@
         .status-indicator.error { background: #ff5252; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .field-item { background: rgba(255, 255, 255, 0.03); border-radius: 12px; padding: 12px 16px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; }
-        .collapsible-header { cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
-        .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+        .collapsible-header { cursor: pointer; display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; width: 100%; }
         .collapsible-content.open { max-height: 2000px; }
         .chevron { transition: transform 0.3s ease; }
         .chevron.open { transform: rotate(180deg); }
@@ -167,7 +167,6 @@
     </div>
 
     <script>
-        // ==================== 全局状态 ====================
         var state = {
             targetGender: 'male',
             originalData: null,
@@ -176,29 +175,20 @@
             originalFileName: '',
             cardImageDataUrl: '',
             availableModels: [],
-            
-            // 任务控制
             isProcessing: false,
             isPaused: false,
-            tasks: [], // 所有任务对象
+            tasks: [],
             activeTasks: 0,
-            maxConcurrency: 5, // 最大并发数
+            maxConcurrency: 5,
             completedCount: 0,
             totalCount: 0
         };
 
-        // ==================== 工具函数 ====================
         function showToast(message, type, duration) {
-            type = type || 'info';
-            duration = duration || 3000;
-            var toast = document.createElement('div');
-            toast.className = 'toast ' + type;
-            toast.textContent = message;
+            type = type || 'info'; duration = duration || 3000;
+            var toast = document.createElement('div'); toast.className = 'toast ' + type; toast.textContent = message;
             document.body.appendChild(toast);
-            setTimeout(function() {
-                toast.style.animation = 'slideIn 0.3s ease reverse';
-                setTimeout(function() { toast.remove(); }, 300);
-            }, duration);
+            setTimeout(function() { toast.style.animation = 'slideIn 0.3s ease reverse'; setTimeout(function() { toast.remove(); }, 300); }, duration);
         }
 
         function toggleCollapsible(id) {
@@ -208,17 +198,9 @@
             chevron.classList.toggle('open');
         }
 
-        function getBaseUrl(url) {
-            return url.replace(/\/\(/, '').replace(/\/chat\/completions\)/, '');
-        }
+        function getBaseUrl(url) { return url.replace(/\/\(/, '').replace(/\/chat\/completions\)/, ''); }
+        function getChatUrl(url) { url = url.replace(/\/$/, ''); if (url.endsWith('/chat/completions')) return url; return url + '/chat/completions'; }
 
-        function getChatUrl(url) {
-            url = url.replace(/\/$/, '');
-            if (url.endsWith('/chat/completions')) return url;
-            return url + '/chat/completions';
-        }
-
-        // ==================== 核心逻辑 ====================
         function setTargetGender(gender) {
             state.targetGender = gender;
             document.getElementById('toggle-male').classList.toggle('active', gender === 'male');
@@ -226,82 +208,47 @@
         }
 
         function clearModelList() {
-            var select = document.getElementById('modelSelect');
-            select.innerHTML = '';
-            var opt = document.createElement('option');
-            opt.value = ""; opt.textContent = "请先加载模型列表";
-            select.appendChild(opt);
-            select.disabled = true;
-            state.availableModels = [];
+            var select = document.getElementById('modelSelect'); select.innerHTML = '';
+            var opt = document.createElement('option'); opt.value = ""; opt.textContent = "请先加载模型列表"; select.appendChild(opt);
+            select.disabled = true; state.availableModels = [];
         }
 
         function loadModels() {
             var apiUrl = document.getElementById('apiUrl').value.trim();
             var apiKey = document.getElementById('apiKey').value.trim();
-            
             if (!apiUrl || !apiKey) { showToast('请先填写 API URL 和 API Key', 'error'); return; }
-            
-            var btn = document.getElementById('loadModelsBtn');
-            var originalText = btn.innerHTML;
+            var btn = document.getElementById('loadModelsBtn'); var originalText = btn.innerHTML;
             btn.disabled = true; btn.innerHTML = '加载中<span class="spinner"></span>';
-            
             var modelsUrl = getBaseUrl(apiUrl) + '/models';
-            
-            fetch(modelsUrl, {
-                method: 'GET',
-                headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' }
-            }).then(function(res) {
-                if (!res.ok) throw new Error('HTTP ' + res.status);
-                return res.json();
-            }).then(function(data) {
+            fetch(modelsUrl, { method: 'GET', headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' } })
+            .then(function(res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+            .then(function(data) {
                 if (!data.data || !Array.isArray(data.data)) throw new Error('格式错误');
                 state.availableModels = data.data.filter(function(m) { return m.id; }).sort(function(a, b) {
-                    var aIsChat = a.id.toLowerCase().indexOf('chat') !== -1;
-                    var bIsChat = b.id.toLowerCase().indexOf('chat') !== -1;
+                    var aIsChat = a.id.toLowerCase().indexOf('chat') !== -1; var bIsChat = b.id.toLowerCase().indexOf('chat') !== -1;
                     return (aIsChat && !bIsChat) ? -1 : (!aIsChat && bIsChat) ? 1 : a.id.localeCompare(b.id);
                 });
-                
-                var select = document.getElementById('modelSelect');
-                select.innerHTML = '';
-                state.availableModels.forEach(function(m) {
-                    var opt = document.createElement('option');
-                    opt.value = m.id; opt.textContent = m.id;
-                    select.appendChild(opt);
-                });
-                select.disabled = false;
-                if (state.availableModels.length > 0) select.value = state.availableModels[0].id;
-                
-                showToast('加载成功', 'success');
-                updateConvertButtonState();
-            }).catch(function(err) {
-                showToast('加载失败: ' + err.message, 'error');
-                clearModelList();
-            }).finally(function() {
-                btn.disabled = false; btn.innerHTML = originalText;
-            });
+                var select = document.getElementById('modelSelect'); select.innerHTML = '';
+                state.availableModels.forEach(function(m) { var opt = document.createElement('option'); opt.value = m.id; opt.textContent = m.id; select.appendChild(opt); });
+                select.disabled = false; if (state.availableModels.length > 0) select.value = state.availableModels[0].id;
+                showToast('加载成功', 'success'); updateConvertButtonState();
+            }).catch(function(err) { showToast('加载失败: ' + err.message, 'error'); clearModelList(); })
+            .finally(function() { btn.disabled = false; btn.innerHTML = originalText; });
         }
 
-        // ==================== 文件处理 ====================
         var dropZone = document.getElementById('dropZone');
         dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
         dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
         dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.classList.remove('dragover'); var f = e.dataTransfer.files[0]; if(f) processFile(f); });
-        
         function handleFileSelect(e) { var f = e.target.files[0]; if(f) processFile(f); }
 
         function processFile(file) {
             state.originalFileName = file.name.replace(/\.(png|json)$/i, '');
             var reader = new FileReader();
-            
             if (file.name.toLowerCase().endsWith('.json')) {
                 reader.onload = function(e) {
-                    try {
-                        state.originalData = JSON.parse(e.target.result);
-                        state.cardImageDataUrl = '';
-                        onFileLoaded();
-                    } catch(err) { showToast('JSON 解析失败', 'error'); }
-                };
-                reader.readAsText(file);
+                    try { state.originalData = JSON.parse(e.target.result); state.cardImageDataUrl = ''; onFileLoaded(); } catch(err) { showToast('JSON 解析失败', 'error'); }
+                }; reader.readAsText(file);
             } else if (file.name.toLowerCase().endsWith('.png')) {
                 reader.onload = function(e) {
                     try {
@@ -309,17 +256,10 @@
                         state.cardImageDataUrl = URL.createObjectURL(file);
                         var charaData = extractCharaFromPNG(state.originalPngBuffer);
                         if (!charaData) throw new Error('无角色数据');
-                        
-                        try {
-                            var jsonStr = atob(charaData);
-                            try { jsonStr = decodeURIComponent(escape(jsonStr)); } catch(e){}
-                            state.originalData = JSON.parse(jsonStr);
-                        } catch(e) { state.originalData = JSON.parse(atob(charaData)); }
-                        
+                        try { var jsonStr = atob(charaData); try { jsonStr = decodeURIComponent(escape(jsonStr)); } catch(e){} state.originalData = JSON.parse(jsonStr); } catch(e) { state.originalData = JSON.parse(atob(charaData)); }
                         onFileLoaded();
                     } catch(err) { showToast('PNG 解析失败: ' + err.message, 'error'); }
-                };
-                reader.readAsArrayBuffer(file);
+                }; reader.readAsArrayBuffer(file);
             }
         }
 
@@ -331,27 +271,21 @@
             document.getElementById('cardName').textContent = data.name || '未知角色';
             document.getElementById('cardCreator').textContent = data.creator ? 'by ' + data.creator : '';
             document.getElementById('cardSpec').textContent = (state.originalData.spec || 'V1') + ' v' + (state.originalData.spec_version || '1.0');
-            updateConvertButtonState();
-            showToast('导入成功', 'success');
+            updateConvertButtonState(); showToast('导入成功', 'success');
         }
 
         function updateConvertButtonState() {
             var hasModel = document.getElementById('modelSelect').value;
             document.getElementById('convertBtn').disabled = !state.originalData || !hasModel;
         }
-
         document.getElementById('modelSelect').addEventListener('change', updateConvertButtonState);
 
-        // ==================== 并发任务管理 (核心重构) ====================
-        
         function initConversion() {
             var apiUrl = document.getElementById('apiUrl').value.trim();
             var apiKey = document.getElementById('apiKey').value.trim();
             var modelName = document.getElementById('modelSelect').value;
-            
             if (!apiUrl || !apiKey || !modelName) { showToast('请完善 API 设置', 'error'); return; }
             
-            // UI 初始化
             document.getElementById('convertBtn').classList.add('hidden');
             document.getElementById('controlPanel').classList.remove('hidden');
             document.getElementById('progressSection').classList.remove('hidden');
@@ -361,102 +295,57 @@
             
             state.convertedData = JSON.parse(JSON.stringify(state.originalData));
             var data = state.convertedData.data || state.convertedData;
-            
-            // 构建任务列表
             state.tasks = [];
+            
             var fields = [
-                { key: 'description', label: '角色描述' },
-                { key: 'first_mes', label: '首条消息' },
-                { key: 'scenario', label: '场景设定' },
-                { key: 'mes_example', label: '对话示例' },
-                { key: 'personality', label: '性格特征' },
-                { key: 'system_prompt', label: '系统提示词' }
+                { key: 'description', label: '角色描述' }, { key: 'first_mes', label: '首条消息' },
+                { key: 'scenario', label: '场景设定' }, { key: 'mes_example', label: '对话示例' },
+                { key: 'personality', label: '性格特征' }, { key: 'system_prompt', label: '系统提示词' }
             ];
-            
-            // 基础字段
             fields.forEach(function(f) {
-                if (data[f.key] && data[f.key].trim()) {
-                    state.tasks.push(createTask(f.key, f.label, data[f.key], function(res) { data[f.key] = res; }));
-                }
+                if (data[f.key] && data[f.key].trim()) state.tasks.push(createTask(f.key, f.label, data[f.key], function(res) { data[f.key] = res; }));
             });
-            
-            // 备用问候
             if (data.alternate_greetings) {
                 data.alternate_greetings.forEach(function(text, i) {
-                    if (text && text.trim()) {
-                        state.tasks.push(createTask('alt_greeting_' + i, '备用问候 ' + (i+1), text, function(res) { data.alternate_greetings[i] = res; }));
-                    }
+                    if (text && text.trim()) state.tasks.push(createTask('alt_greeting_' + i, '备用问候 ' + (i+1), text, function(res) { data.alternate_greetings[i] = res; }));
                 });
             }
-            
-            // 世界书
             if (data.character_book && data.character_book.entries) {
                 data.character_book.entries.forEach(function(entry, i) {
-                    if (entry.content && entry.content.trim()) {
-                        state.tasks.push(createTask('book_' + i, '世界书条目 ' + (i+1), entry.content, function(res) { entry.content = res; }));
-                    }
+                    if (entry.content && entry.content.trim()) state.tasks.push(createTask('book_' + i, '世界书条目 ' + (i+1), entry.content, function(res) { entry.content = res; }));
                 });
             }
             
-            state.totalCount = state.tasks.length;
-            state.completedCount = 0;
-            state.activeTasks = 0;
-            state.isPaused = false;
-            state.isProcessing = true;
-            
-            renderTaskList();
-            processQueue(getChatUrl(apiUrl), apiKey, modelName);
+            state.totalCount = state.tasks.length; state.completedCount = 0; state.activeTasks = 0;
+            state.isPaused = false; state.isProcessing = true;
+            renderTaskList(); processQueue(getChatUrl(apiUrl), apiKey, modelName);
         }
 
         function createTask(id, label, content, updateFn) {
-            return {
-                id: id,
-                label: label,
-                content: content,
-                updateFn: updateFn,
-                status: 'pending', // pending, processing, done, error
-                errorMsg: ''
-            };
+            return { id: id, label: label, content: content, updateFn: updateFn, status: 'pending', errorMsg: '' };
         }
 
         function renderTaskList() {
-            var container = document.getElementById('fieldProgress');
-            container.innerHTML = '';
+            var container = document.getElementById('fieldProgress'); container.innerHTML = '';
             state.tasks.forEach(function(task) {
-                var div = document.createElement('div');
-                div.className = 'field-item';
-                div.id = 'task-el-' + task.id;
-                div.innerHTML = 
-                    '<div class="flex items-center overflow-hidden">' +
-                        '<span class="status-indicator pending"></span>' +
-                        '<span class="text-sm text-gray-300 truncate">' + task.label + '</span>' +
-                    '</div>' +
-                    '<span class="error-msg"></span>';
+                var div = document.createElement('div'); div.className = 'field-item'; div.id = 'task-el-' + task.id;
+                div.innerHTML = '<div class="flex items-center overflow-hidden"><span class="status-indicator pending"></span><span class="text-sm text-gray-300 truncate">' + task.label + '</span></div><span class="error-msg"></span>';
                 container.appendChild(div);
             });
             updateProgressUI();
         }
 
         function updateTaskUI(task) {
-            var el = document.getElementById('task-el-' + task.id);
-            if (!el) return;
-            var indicator = el.querySelector('.status-indicator');
-            var errorSpan = el.querySelector('.error-msg');
-            
+            var el = document.getElementById('task-el-' + task.id); if (!el) return;
+            var indicator = el.querySelector('.status-indicator'); var errorSpan = el.querySelector('.error-msg');
             indicator.className = 'status-indicator ' + task.status;
-            if (task.status === 'error') {
-                errorSpan.textContent = task.errorMsg;
-                errorSpan.title = task.errorMsg; // Tooltip
-            } else {
-                errorSpan.textContent = '';
-            }
+            if (task.status === 'error') { errorSpan.textContent = task.errorMsg; errorSpan.title = task.errorMsg; } else { errorSpan.textContent = ''; }
         }
 
         function updateProgressUI() {
             var pct = Math.round((state.completedCount / state.totalCount) * 100) || 0;
             document.getElementById('progressBar').style.width = pct + '%';
             document.getElementById('progressCount').textContent = state.completedCount + '/' + state.totalCount;
-            
             var statusText = state.isPaused ? '已暂停' : (state.activeTasks > 0 ? '正在并发处理 ' + state.activeTasks + ' 个任务...' : '处理完成');
             document.getElementById('progressStatus').textContent = statusText;
         }
@@ -466,11 +355,8 @@
             var btn = document.getElementById('pauseBtn');
             btn.textContent = state.isPaused ? '▶️ 继续' : '⏸️ 暂停';
             btn.className = state.isPaused ? 'btn-primary py-3 text-lg font-semibold' : 'btn-secondary py-3 text-lg font-semibold';
-            updateProgressUI();
             if (!state.isPaused) {
-                var apiUrl = document.getElementById('apiUrl').value.trim();
-                var apiKey = document.getElementById('apiKey').value.trim();
-                var modelName = document.getElementById('modelSelect').value;
+                var apiUrl = document.getElementById('apiUrl').value.trim(); var apiKey = document.getElementById('apiKey').value.trim(); var modelName = document.getElementById('modelSelect').value;
                 processQueue(getChatUrl(apiUrl), apiKey, modelName);
             }
         }
@@ -478,52 +364,29 @@
         function retryFailed() {
             document.getElementById('retryBtn').classList.add('hidden');
             state.tasks.forEach(function(task) {
-                if (task.status === 'error') {
-                    task.status = 'pending';
-                    task.errorMsg = '';
-                    updateTaskUI(task);
-                    state.completedCount--;
-                }
+                if (task.status === 'error') { task.status = 'pending'; task.errorMsg = ''; updateTaskUI(task); state.completedCount--; }
             });
             state.isPaused = false;
-            var apiUrl = document.getElementById('apiUrl').value.trim();
-            var apiKey = document.getElementById('apiKey').value.trim();
-            var modelName = document.getElementById('modelSelect').value;
+            var apiUrl = document.getElementById('apiUrl').value.trim(); var apiKey = document.getElementById('apiKey').value.trim(); var modelName = document.getElementById('modelSelect').value;
             processQueue(getChatUrl(apiUrl), apiKey, modelName);
         }
 
         function processQueue(apiUrl, apiKey, modelName) {
             if (state.isPaused) return;
-
-            // 检查是否全部完成
-            if (state.completedCount === state.totalCount) {
-                onAllFinished();
-                return;
-            }
-
-            // 填充并发池
+            if (state.completedCount === state.totalCount) { onAllFinished(); return; }
             while (state.activeTasks < state.maxConcurrency && !state.isPaused) {
                 var task = state.tasks.find(function(t) { return t.status === 'pending'; });
-                if (!task) break; // 没有待处理任务
-
+                if (!task) break;
                 runTask(task, apiUrl, apiKey, modelName);
             }
         }
 
         function runTask(task, apiUrl, apiKey, modelName) {
-            state.activeTasks++;
-            task.status = 'processing';
-            updateTaskUI(task);
-            updateProgressUI();
-
+            state.activeTasks++; task.status = 'processing'; updateTaskUI(task); updateProgressUI();
             convertTextWithAI(task.content, apiUrl, apiKey, modelName)
-                .then(function(result) {
-                    task.updateFn(result);
-                    task.status = 'done';
-                })
+                .then(function(result) { task.updateFn(result); task.status = 'done'; })
                 .catch(function(err) {
                     task.status = 'error';
-                    // 提取更友好的错误信息
                     var msg = err.message;
                     if (msg.indexOf('429') !== -1) msg = '429 请求过多';
                     else if (msg.indexOf('404') !== -1) msg = '404 接口错误';
@@ -532,11 +395,8 @@
                     task.errorMsg = msg;
                 })
                 .finally(function() {
-                    state.activeTasks--;
-                    state.completedCount++;
-                    updateTaskUI(task);
-                    updateProgressUI();
-                    processQueue(apiUrl, apiKey, modelName); // 触发下一个
+                    state.activeTasks--; state.completedCount++; updateTaskUI(task); updateProgressUI();
+                    processQueue(apiUrl, apiKey, modelName);
                 });
         }
 
@@ -546,22 +406,22 @@
                 document.getElementById('retryBtn').classList.remove('hidden');
                 showToast('部分任务失败，请检查并重试', 'error');
             } else {
-                showDiffPreview();
+                // 强制显示导出，哪怕预览失败
                 document.getElementById('exportSection').classList.remove('hidden');
                 document.getElementById('controlPanel').classList.add('hidden');
-                document.getElementById('convertBtn').textContent = '✅ 转换成功 (点击重新开始)';
+                document.getElementById('convertBtn').textContent = '✅ 转换成功 (点击刷新)';
                 document.getElementById('convertBtn').classList.remove('hidden');
                 document.getElementById('convertBtn').disabled = false;
                 document.getElementById('convertBtn').onclick = function() { location.reload(); };
+                
+                try { showDiffPreview(); } catch(e) { console.error('预览生成失败', e); }
                 showToast('所有任务转换完成！', 'success');
             }
         }
 
-        // ==================== AI 请求 ====================
         function convertTextWithAI(text, apiUrl, apiKey, modelName) {
             var genderTarget = state.targetGender === 'male' ? '男性' : '女性';
             var systemPrompt = '你是一位专业的文本编辑专家。任务：将文本中关于"用户/玩家/You/{{user}}"的性别描述转换为' + genderTarget + '。\n原则：\n1. 仅修改User性别相关词(他/她, 哥哥/姐姐, 身体部位等)。\n2. 100%保留原格式、符号、文风。\n3. 识别BG/BL/GL逻辑，处理解剖学术语。\n4. 直接输出修改后文本，无解释。';
-
             return fetch(apiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
@@ -572,66 +432,61 @@
                 })
             }).then(function(res) {
                 if (!res.ok) {
-                    // 尝试读取错误详情
                     return res.text().then(function(text) {
-                        try {
-                            var json = JSON.parse(text);
-                            var msg = (json.error && json.error.message) || text;
-                            throw new Error(res.status + ' ' + msg);
-                        } catch(e) {
-                            throw new Error(res.status + ' ' + res.statusText);
-                        }
+                        try { var json = JSON.parse(text); var msg = (json.error && json.error.message) || text; throw new Error(res.status + ' ' + msg); } catch(e) { throw new Error(res.status + ' ' + res.statusText); }
                     });
                 }
                 return res.json();
-            }).then(function(json) {
-                return json.choices[0].message.content;
-            });
+            }).then(function(json) { return json.choices[0].message.content; });
         }
 
-        // ==================== Diff & Export (保持不变) ====================
         function showDiffPreview() {
             document.getElementById('diffSection').classList.remove('hidden');
             var diffContent = document.getElementById('diffContent');
             diffContent.innerHTML = '';
-            
-            // 简单复用 tasks 来生成 diff，因为 tasks 包含了所有修改过的字段
             var html = '';
-            state.tasks.forEach(function(task) {
-                if (task.status !== 'done') return;
-                // 只有内容变了才显示
-                var newVal = '';
-                task.updateFn({ toString: function() { return newVal; } }); // Hacky way to get new value if we didn't store it separately? 
-                // 其实 task.updateFn 已经修改了 convertedData，我们直接对比 originalData 和 convertedData 对应位置更稳妥
-                // 为了简单，我们重新遍历字段生成 diff，逻辑同之前
-            });
             
-            // 使用之前的逻辑重新生成 diff
             var orig = state.originalData.data || state.originalData;
             var conv = state.convertedData.data || state.convertedData;
             
-            // ... (Diff 生成逻辑与之前相同，略微简化) ...
-            // 为了节省篇幅，这里复用之前的 generateDiff 逻辑
             var fields = [
-                { key: 'description', label: '角色描述' },
-                { key: 'first_mes', label: '首条消息' },
-                { key: 'scenario', label: '场景设定' },
-                { key: 'mes_example', label: '对话示例' },
-                { key: 'personality', label: '性格特征' },
-                { key: 'system_prompt', label: '系统提示词' }
+                { key: 'description', label: '角色描述' }, { key: 'first_mes', label: '首条消息' },
+                { key: 'scenario', label: '场景设定' }, { key: 'mes_example', label: '对话示例' },
+                { key: 'personality', label: '性格特征' }, { key: 'system_prompt', label: '系统提示词' }
             ];
-            if (orig.alternate_greetings) orig.alternate_greetings.forEach((_, i) => fields.push({key: 'alt', idx: i, label: '备用问候 '+(i+1)}));
-            if (orig.character_book && orig.character_book.entries) orig.character_book.entries.forEach((_, i) => fields.push({key: 'book', idx: i, label: '世界书 '+(i+1)}));
+            
+            // 安全地遍历备用问候
+            if (orig.alternate_greetings && Array.isArray(orig.alternate_greetings)) {
+                orig.alternate_greetings.forEach(function(_, i) {
+                    fields.push({ key: 'alt', idx: i, label: '备用问候 '+(i+1) });
+                });
+            }
+            
+            // 安全地遍历世界书
+            if (orig.character_book && orig.character_book.entries && Array.isArray(orig.character_book.entries)) {
+                orig.character_book.entries.forEach(function(_, i) {
+                    fields.push({ key: 'book', idx: i, label: '世界书 '+(i+1) });
+                });
+            }
 
             fields.forEach(function(f) {
                 var oTxt = '', cTxt = '';
-                if(f.key === 'alt') { oTxt = orig.alternate_greetings[f.idx]; cTxt = conv.alternate_greetings[f.idx]; }
-                else if(f.key === 'book') { oTxt = orig.character_book.entries[f.idx].content; cTxt = conv.character_book.entries[f.idx].content; }
-                else { oTxt = orig[f.key]; cTxt = conv[f.key]; }
-                
-                if(oTxt && cTxt && oTxt !== cTxt) {
-                    html += '<div class="field-item block"><div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle(\'open\')"><h3 class="font-medium text-purple-300">'+f.label+'</h3><span class="text-xs text-gray-500">点击展开</span></div><div class="collapsible-content open"><div class="preview-section mt-2 text-sm text-gray-300 whitespace-pre-wrap">'+generateDiff(oTxt, cTxt)+'</div></div></div>';
-                }
+                try {
+                    if(f.key === 'alt') { 
+                        oTxt = orig.alternate_greetings[f.idx] || ''; 
+                        cTxt = conv.alternate_greetings[f.idx] || ''; 
+                    } else if(f.key === 'book') { 
+                        oTxt = orig.character_book.entries[f.idx] ? orig.character_book.entries[f.idx].content : ''; 
+                        cTxt = conv.character_book.entries[f.idx] ? conv.character_book.entries[f.idx].content : ''; 
+                    } else { 
+                        oTxt = orig[f.key] || ''; 
+                        cTxt = conv[f.key] || ''; 
+                    }
+                    
+                    if(oTxt && cTxt && oTxt !== cTxt) {
+                        html += '<div class="field-item block"><div class="collapsible-header" onclick="this.nextElementSibling.classList.toggle(\'open\')"><h3 class="font-medium text-purple-300">'+f.label+'</h3><span class="text-xs text-gray-500">点击展开</span></div><div class="collapsible-content open"><div class="preview-section mt-2 text-sm text-gray-300 whitespace-pre-wrap">'+generateDiff(oTxt, cTxt)+'</div></div></div>';
+                    }
+                } catch(e) { console.error('Diff error', e); }
             });
             diffContent.innerHTML = html || '<p class="text-gray-500 text-center">没有检测到内容变更</p>';
         }
@@ -654,7 +509,6 @@
         }
         function escapeHtml(t) { var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
 
-        // ==================== PNG 处理 (保持不变) ====================
         function safeUint8ArrayToString(u8a) {
             if (typeof TextDecoder !== 'undefined') return new TextDecoder('iso-8859-1').decode(u8a);
             var res = [], chunk = 0x8000;
