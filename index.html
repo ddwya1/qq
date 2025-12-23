@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡重构台 (JSON结构锁)</title>
+    <title>角色卡重构台 (双重精修版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* 基础设置 */
@@ -19,7 +19,7 @@
             padding: 12px 16px;
             display: flex; justify-content: space-between; align-items: center;
         }
-        .nav-title { font-weight: 800; font-size: 1.1rem; color: #a78bfa; } 
+        .nav-title { font-weight: 800; font-size: 1.1rem; color: #f472b6; } /* 粉色代表精修 */
         
         /* 设置面板 */
         #settingsPanel { background: #18181b; border-bottom: 1px solid #27272a; padding: 16px; display: none; }
@@ -32,9 +32,8 @@
         .btn {
             display: flex; justify-content: center; align-items: center;
             padding: 10px; border-radius: 8px; font-weight: 600; font-size: 14px;
-            border: none; width: 100%; margin-bottom: 5px; cursor: pointer;
+            border: none; width: 100%; margin-bottom: 5px;
         }
-        .btn:active { transform: scale(0.98); }
         .btn-blue { background: #2563eb; color: white; }
         .btn-red { background: #dc2626; color: white; }
         .btn-gray { background: #3f3f46; color: white; }
@@ -44,10 +43,9 @@
         .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
         .card-header { background: #27272a; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #a1a1aa; display: flex; justify-content: space-between; }
         
-        /* 文本内容样式 */
         .text-content {
             background: #09090b; color: #d4d4d8; padding: 14px; 
-            font-family: monospace; font-size: 13px; line-height: 1.8; 
+            font-family: monospace; font-size: 13px; line-height: 1.6;
             white-space: pre-wrap; 
             word-wrap: break-word;
             border-top: 1px solid #27272a;
@@ -56,7 +54,12 @@
         /* 状态动画 */
         .highlight-change { animation: flash 1.5s; }
         @keyframes flash { 0% { background: rgba(16, 185, 129, 0.2); } 100% { background: #09090b; } }
-        .upload-box { border: 2px dashed #3f3f46; border-radius: 12px; padding: 40px 20px; text-align: center; color: #71717a; margin: 16px; cursor: pointer; }
+        .upload-box { border: 2px dashed #3f3f46; border-radius: 12px; padding: 40px 20px; text-align: center; color: #71717a; margin: 16px; }
+        
+        /* 步骤指示器 */
+        .step-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
+        .step-1 { background: #eab308; color: black; } /* 黄色：改字 */
+        .step-2 { background: #3b82f6; color: white; } /* 蓝色：修格式 */
     </style>
     <script>
         window.onerror = function(msg, url, line) {
@@ -68,12 +71,12 @@
 <body>
 
     <div class="navbar">
-        <div class="nav-title">🧬 角色重构台 (JSON锁)</div>
-        <button onclick="toggleSettings()" style="font-size:20px; background:none; border:none; cursor:pointer;">⚙️</button>
+        <div class="nav-title">🧬 角色重构台 (双重精修)</div>
+        <button onclick="toggleSettings()" style="font-size:20px; background:none; border:none;">⚙️</button>
     </div>
 
     <div id="settingsPanel">
-        <input type="text" id="apiUrl" class="input-dark" placeholder="API URL (例如 https://api.openai.com/v1)">
+        <input type="text" id="apiUrl" class="input-dark" placeholder="API URL">
         <input type="password" id="apiKey" class="input-dark" placeholder="API Key">
         <div class="flex gap-2">
             <button onclick="loadModels()" id="loadBtn" class="btn btn-blue">连接服务器</button>
@@ -94,7 +97,6 @@
                 <button onclick="startAiConvert('male')" class="btn btn-blue">♂ 转男 (BL/BG)</button>
                 <button onclick="startAiConvert('female')" class="btn btn-red">♀ 转女 (BG/GL)</button>
             </div>
-            <div class="text-[10px] text-gray-600 mt-1 text-center">已启用 JSON 结构锁，防止格式错乱</div>
         </div>
 
         <div class="bg-[#18181b] p-3 rounded-xl border border-[#27272a]">
@@ -110,7 +112,7 @@
     <div id="dropZone" class="upload-box" onclick="document.getElementById('fileInput').click()">
         <input type="file" id="fileInput" class="hidden" accept=".png,.json" onchange="handleFile(this.files[0])">
         <div class="text-4xl mb-2">📂</div>
-        <div class="text-sm">点击上传角色卡 (JSON/PNG)</div>
+        <div class="text-sm">点击上传角色卡</div>
     </div>
 
     <div id="contentArea" class="hidden px-4 pb-10">
@@ -124,7 +126,6 @@
     </div>
 
     <script>
-        // --- 设置与连接 ---
         function toggleSettings() {
             var panel = document.getElementById('settingsPanel');
             panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
@@ -167,7 +168,6 @@
                 
                 sel.disabled = false;
                 alert('连接成功');
-                toggleSettings(); // 成功后自动收起
             } catch(e) {
                 alert('连接失败: ' + e.message);
             } finally {
@@ -175,7 +175,6 @@
             }
         }
 
-        // --- AI 处理核心逻辑 (JSON锁死版) ---
         var isProcessing = false;
         var shouldStop = false;
 
@@ -186,6 +185,7 @@
             }
         }
 
+        // ================= 双重处理核心逻辑 =================
         async function startAiConvert(gender) {
             if (isProcessing) return;
             var blocks = document.querySelectorAll('.text-content');
@@ -195,7 +195,7 @@
             if (document.getElementById('modelSelect').disabled || !model) return alert('请先连接API');
 
             var confirmMsg = gender === 'male' ? '转为男性 (BL/BG)' : '转为女性 (BG/GL)';
-            if (!confirm('确认' + confirmMsg + '？\n(已启用JSON强力结构锁，处理速度可能稍慢)')) return;
+            if (!confirm('此模式将对每段文本处理两次（1.改内容 2.修格式），速度较慢但效果最好。确认' + confirmMsg + '？')) return;
 
             isProcessing = true;
             shouldStop = false;
@@ -205,86 +205,61 @@
             var avoid = gender === 'male' ? '她' : '他';
             var want = gender === 'male' ? '他' : '她';
 
-            // Prompt: 强制 AI 作为数据处理器，而非小说家
-            var prompt = 
-                "你是一个 JSON 数据处理器。任务是将输入的字符串数组进行变量替换。\n" +
-                "【替换规则】：\n" +
-                "1. User性别逻辑转为【" + target + "】。\n" +
-                "2. 将代词【" + avoid + "】替换为【" + want + "】。\n" +
-                "3. 修改生理/NSFW描述以匹配" + target + "。\n" +
-                "【严格格式要求】：\n" +
-                "1. 接收 JSON 数组，必须返回 JSON 数组。\n" +
-                "2. 严禁合并数组元素！输入有多少行，输出就必须有多少行。\n" +
-                "3. 严禁修改 < > 标签和 {{user}} 占位符。\n" +
-                "4. 保持空字符串元素不变，以维持段落间距。\n" +
-                "5. 仅输出 JSON，不要包含 Markdown 标记。";
+            // 步骤 1 提示词：只管改内容，允许格式乱
+            var promptStep1 = 
+                "你是一个小说重写工具。任务：\n" +
+                "1. 将User性别改为【" + target + "】。\n" +
+                "2. 将代词【" + avoid + "】改为【" + want + "】。\n" +
+                "3. 【NSFW/生理重构】：根据" + target + "的生理结构修改器官和动作描写（如将女性特征改为男性特征）。\n" +
+                "4. 保持剧情不变，直接输出修改后的文本。";
 
             var count = 0;
             for (var i = 0; i < blocks.length; i++) {
                 if (shouldStop) { alert('已停止'); break; }
 
                 var block = blocks[i];
-                var txt = block.textContent;
-                // 如果内容太短，没必要用 JSON 锁，直接处理（省token），但为了稳妥这里统一用 JSON
-                if (!txt || !txt.trim()) continue;
+                var originalTxt = block.textContent; // 保留最原始的文本作为格式模板
+                if (!originalTxt || !originalTxt.trim()) continue;
 
                 count++;
-                document.getElementById('statusText').innerText = "处理中 " + count + "/" + blocks.length;
-                block.parentElement.style.opacity = '0.5';
-
-                // 1. 切割文本为数组 (保留空行，空行是段落间距的关键)
-                var lines = txt.split(/\r\n|\n/);
-                
-                // 2. 包装为 JSON
-                var jsonPayload = JSON.stringify(lines);
+                block.parentElement.style.opacity = '0.6';
 
                 try {
-                    // 3. 发送给 AI
-                    var responseText = await callAi(jsonPayload, prompt, model);
+                    // --- 第一步：改内容 ---
+                    document.getElementById('statusText').innerText = "处理 " + count + "/" + blocks.length + " [1.改字]";
+                    var modifiedTxt = await callAi(originalTxt, promptStep1, model);
                     
-                    if (shouldStop) { block.parentElement.style.opacity = '1'; alert('已停止'); break; }
+                    if (shouldStop) break;
 
-                    if (responseText) {
-                        // 4. 解析 AI 返回的 JSON
-                        var resultLines = null;
-                        try {
-                            // 清洗可能存在的 Markdown 标记
-                            var cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-                            // 截取合法的 JSON 部分
-                            var start = cleanJson.indexOf('[');
-                            var end = cleanJson.lastIndexOf(']');
-                            if (start !== -1 && end !== -1) {
-                                cleanJson = cleanJson.substring(start, end + 1);
-                                resultLines = JSON.parse(cleanJson);
-                            } else {
-                                // 如果 AI 没返回 JSON（极少情况），尝试直接用文本
-                                console.warn("AI未返回JSON，降级处理");
-                            }
-                        } catch (e) {
-                            console.error("JSON解析失败", e);
-                        }
+                    // --- 第二步：修格式 ---
+                    // 这一步是把“改好的字”填进“原来的格式”里
+                    if (modifiedTxt && modifiedTxt !== originalTxt) {
+                        document.getElementById('statusText').innerText = "处理 " + count + "/" + blocks.length + " [2.排版]";
+                        
+                        var promptStep2 = 
+                            "你是一个【格式对齐引擎】。任务是将【新内容】填充回【原模板】的格式中。\n" +
+                            "【原模板】：\n" + originalTxt + "\n\n" +
+                            "【新内容】：\n" + modifiedTxt + "\n\n" +
+                            "【指令】：\n" +
+                            "1. 输出内容必须是【新内容】的文字。\n" +
+                            "2. 输出格式（换行、空格、XML标签位置）必须和【原模板】一模一样！\n" +
+                            "3. 如果原模板有 <标签>，输出也必须有，且位置一致。\n" +
+                            "4. 严禁合并段落！严禁删除换行符！\n" +
+                            "5. 直接输出最终结果。";
 
-                        // 5. 还原文本
-                        if (Array.isArray(resultLines)) {
-                            // 数组重新拼回文本，使用换行符连接
-                            var newTxt = resultLines.join("\n");
+                        var finalTxt = await callAi("请执行格式对齐", promptStep2, model);
+
+                        if (shouldStop) break;
+
+                        if (finalTxt) {
+                            // 最终兜底：防止 AI 在第二步还是把 XML 标签粘连了
+                            finalTxt = finalTxt.replace(/>\s*</g, ">\n<");
                             
-                            // 兜底修复：防止 XML 标签被意外粘连
-                            newTxt = newTxt.replace(/>\s*</g, ">\n<");
-
-                            if (newTxt !== txt) {
-                                block.textContent = newTxt;
-                                block.classList.add('highlight-change');
-                                (function(el) {
-                                    setTimeout(function() { el.classList.remove('highlight-change'); }, 1500);
-                                })(block);
-                            }
-                        } else {
-                            // 如果解析失败，说明 AI 还是输出了纯文本，直接用纯文本（虽然可能格式乱了，但比报错好）
-                            // 通常用了 JSON Prompt 后不会进这里
-                            if (responseText.length > 0 && responseText.indexOf('[') === -1) {
-                                block.textContent = responseText; 
-                            }
+                            block.textContent = finalTxt;
+                            block.classList.add('highlight-change');
+                            (function(el) {
+                                setTimeout(function() { el.classList.remove('highlight-change'); }, 1500);
+                            })(block);
                         }
                     }
                 } catch (e) {
@@ -312,7 +287,7 @@
                 body: JSON.stringify({
                     model: model,
                     messages: [{role:'system',content:sys},{role:'user',content:text}],
-                    temperature: 0.1, // 低温保证逻辑严密，不乱改格式
+                    temperature: 0.1,
                     max_tokens: 4000
                 })
             });
@@ -324,12 +299,13 @@
 
             var json = await res.json();
             if (json.choices && json.choices.length > 0) {
-                return json.choices[0].message.content;
+                var content = json.choices[0].message.content;
+                content = content.replace(/^```.*\n/g, '').replace(/\n```$/g, '');
+                return content;
             }
             return text;
         }
 
-        // --- 辅助功能 ---
         function applyManualReplace() {
             var f = document.getElementById('findText').value;
             var r = document.getElementById('replaceText').value;
