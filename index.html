@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡重构台 (行锁死版)</title>
+    <title>角色卡重构台 (分块流水线版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #09090b; color: #e4e4e7; font-family: sans-serif; padding-bottom: 40px; }
@@ -17,7 +17,7 @@
             padding: 12px 16px;
             display: flex; justify-content: space-between; align-items: center;
         }
-        .nav-title { font-weight: 800; font-size: 1.1rem; color: #f87171; } /* 红色代表最终防线 */
+        .nav-title { font-weight: 800; font-size: 1.1rem; color: #fbbf24; } /* 金色代表工业级稳定 */
         
         #settingsPanel { background: #18181b; border-bottom: 1px solid #27272a; padding: 16px; display: none; }
 
@@ -49,6 +49,10 @@
         .highlight-change { animation: flash 1.5s; }
         @keyframes flash { 0% { background: rgba(16, 185, 129, 0.2); } 100% { background: #09090b; } }
         .upload-box { border: 2px dashed #3f3f46; border-radius: 12px; padding: 40px 20px; text-align: center; color: #71717a; margin: 16px; }
+        
+        /* 进度条 */
+        .progress-container { width: 100%; background-color: #27272a; height: 4px; border-radius: 2px; margin-top: 8px; overflow: hidden; display: none; }
+        .progress-bar { height: 100%; background-color: #fbbf24; width: 0%; transition: width 0.3s; }
     </style>
     <script>
         window.onerror = function(msg, url, line) {
@@ -60,7 +64,7 @@
 <body>
 
     <div class="navbar">
-        <div class="nav-title">🧬 角色重构台 (行锁死版)</div>
+        <div class="nav-title">🧬 角色重构台 (工业流水线)</div>
         <button onclick="toggleSettings()" style="font-size:20px; background:none; border:none;">⚙️</button>
     </div>
 
@@ -78,11 +82,14 @@
             <div class="flex justify-between items-center mb-2">
                 <span class="text-xs font-bold text-blue-400">AI 智能改写</span>
                 <div id="aiStatus" class="hidden flex items-center">
-                    <span id="statusText" class="text-xs text-yellow-500">处理中...</span>
+                    <span id="statusText" class="text-xs text-yellow-500">准备中...</span>
                     <button onclick="stopAiConvert()" class="btn-stop">⏹️ 停止</button>
                 </div>
             </div>
-            <div class="flex gap-2">
+            <div id="progressBarContainer" class="progress-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+            <div class="flex gap-2 mt-2">
                 <button onclick="startAiConvert('male')" class="btn btn-blue">♂ 转男 (BL/BG)</button>
                 <button onclick="startAiConvert('female')" class="btn btn-red">♀ 转女 (BG/GL)</button>
             </div>
@@ -174,6 +181,7 @@
             }
         }
 
+        // ================= 分块处理核心逻辑 =================
         async function startAiConvert(gender) {
             if (isProcessing) return;
             var blocks = document.querySelectorAll('.text-content');
@@ -183,85 +191,105 @@
             if (document.getElementById('modelSelect').disabled || !model) return alert('请先连接API');
 
             var confirmMsg = gender === 'male' ? '转为男性 (BL/BG)' : '转为女性 (BG/GL)';
-            if (!confirm('确认' + confirmMsg + '？')) return;
+            if (!confirm('确认' + confirmMsg + '？\n将采用分块处理模式，请耐心等待进度条走完。')) return;
 
             isProcessing = true;
             shouldStop = false;
             document.getElementById('aiStatus').classList.remove('hidden');
-            document.getElementById('statusText').innerText = "准备中...";
+            document.getElementById('progressBarContainer').style.display = 'block';
+            document.getElementById('progressBar').style.width = '0%';
             
             var target = gender === 'male' ? '男性' : '女性';
             var avoid = gender === 'male' ? '她' : '他';
             var want = gender === 'male' ? '他' : '她';
 
-            // 【行锁死 Prompt】
-            // 核心指令：告诉 AI 它处理的是一个数组，绝对不能合并数组项
+            // 分块 Prompt：专门处理短文本，指令超强
             var prompt = 
-                "你是一个JSON数组处理器。任务：\n" +
-                "1. 我会发给你一个字符串数组。\n" +
-                "2. 请修改数组中每个字符串的性别指代（User改为【" + target + "】，【" + avoid + "】改为【" + want + "】）。\n" +
-                "3. 修改生理/NSFW描述以匹配" + target + "。\n" +
-                "4. ⚠️ 严禁修改数组结构！严禁合并数组项！\n" +
-                "5. 严禁修改 XML 标签（如 <tag>）。\n" +
-                "6. 直接返回 JSON 数组，不要代码块标记。";
+                "你是一个文本片段重写工具。任务：\n" +
+                "1. 将片段中指代User的词汇改为【" + target + "】，代词【" + avoid + "】改为【" + want + "】。\n" +
+                "2. 【NSFW/生理重构】：根据" + target + "的生理结构修改器官和动作描写（如将女性特征改为男性特征）。\n" +
+                "3. 【格式死命令】：\n" +
+                "   - 这是一个文本切片，**严禁合并行**！\n" +
+                "   - **严禁删除空行**！\n" +
+                "   - 保持 XML 标签（如 <tag>）原样不动。\n" +
+                "   - 直接输出修改后的文本，不要加 ``` 代码块标记。";
 
-            var count = 0;
+            var totalBlocks = blocks.length;
+            
             for (var i = 0; i < blocks.length; i++) {
                 if (shouldStop) { alert('已停止'); break; }
 
                 var block = blocks[i];
-                var txt = block.textContent;
-                if (!txt || !txt.trim()) continue;
+                var fullText = block.textContent;
+                if (!fullText || !fullText.trim()) continue;
 
-                count++;
-                document.getElementById('statusText').innerText = "处理中 " + count + "/" + blocks.length;
-                block.parentElement.style.opacity = '0.5';
-
-                // 【核心：物理切片】
-                // 把文本按换行符切成数组。AI 只能看到一行行的字，看不到换行符，所以没法删换行符。
-                var lines = txt.split('\n');
-                var jsonPayload = JSON.stringify(lines);
-
-                try {
-                    var jsonResponse = await callAi(jsonPayload, prompt, model);
-                    
-                    if (shouldStop) { block.parentElement.style.opacity = '1'; alert('已停止'); break; }
-
-                    if (jsonResponse) {
-                        try {
-                            // 清洗 AI 可能返回的 Markdown 标记
-                            var cleanJson = jsonResponse.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
-                            var newLines = JSON.parse(cleanJson);
-
-                            if (Array.isArray(newLines)) {
-                                // 【核心：物理还原】
-                                // 把 AI 改好的单行，用换行符重新拼起来
-                                var newTxt = newLines.join('\n');
-                                
-                                if (newTxt !== txt) {
-                                    block.textContent = newTxt;
-                                    block.classList.add('highlight-change');
-                                    (function(el) {
-                                        setTimeout(function() { el.classList.remove('highlight-change'); }, 1500);
-                                    })(block);
-                                }
-                            } else {
-                                console.error("AI 返回格式错误，非数组");
-                            }
-                        } catch (parseErr) {
-                            console.error("JSON 解析失败: " + parseErr);
-                            // 如果 AI 偶尔犯傻没返回 JSON，我们就不改这一段，保证不坏
-                        }
-                    }
-                } catch (e) {
-                    console.error(e);
-                    block.style.border = "1px solid red";
+                block.parentElement.style.opacity = '0.6';
+                
+                // === 切分逻辑 ===
+                // 按换行符切分
+                var lines = fullText.split('\n');
+                var chunks = [];
+                var chunkSize = 15; // 每 15 行一个块，这个大小 AI 处理最稳
+                
+                for (var j = 0; j < lines.length; j += chunkSize) {
+                    chunks.push(lines.slice(j, j + chunkSize).join('\n'));
                 }
+
+                var processedChunks = [];
+                
+                // === 逐块处理 ===
+                for (var k = 0; k < chunks.length; k++) {
+                    if (shouldStop) break;
+                    
+                    var chunk = chunks[k];
+                    // 如果这块全是空行或者太短，直接跳过不发给 AI，省钱又省事
+                    if (!chunk.trim()) {
+                        processedChunks.push(chunk);
+                        continue;
+                    }
+
+                    document.getElementById('statusText').innerText = 
+                        "卡片 " + (i + 1) + "/" + totalBlocks + " - 进度 " + Math.round((k + 1) / chunks.length * 100) + "%";
+
+                    try {
+                        var newChunk = await callAi(chunk, prompt, model);
+                        if (newChunk) {
+                            processedChunks.push(newChunk);
+                        } else {
+                            processedChunks.push(chunk); // 失败兜底
+                        }
+                    } catch (e) {
+                        console.error(e);
+                        processedChunks.push(chunk); // 报错兜底
+                        block.style.border = "1px solid red";
+                    }
+                }
+
+                if (shouldStop) { block.parentElement.style.opacity = '1'; alert('已停止'); break; }
+
+                // === 拼装回填 ===
+                var finalText = processedChunks.join('\n');
+                
+                // 最终兜底修复：防止 AI 在最后一块把标签粘连了
+                finalText = finalText.replace(/>\s*</g, ">\n<");
+
+                if (finalText !== fullText) {
+                    block.textContent = finalText;
+                    block.classList.add('highlight-change');
+                    (function(el) {
+                        setTimeout(function() { el.classList.remove('highlight-change'); }, 1500);
+                    })(block);
+                }
+                
                 block.parentElement.style.opacity = '1';
+                
+                // 更新总进度条
+                document.getElementById('progressBar').style.width = ((i + 1) / totalBlocks * 100) + "%";
             }
 
             isProcessing = false;
             document.getElementById('aiStatus').classList.add('hidden');
+            document.getElementById('progressBarContainer').style.display = 'none';
             if (!shouldStop) alert('处理完成');
             shouldStop = false;
         }
@@ -278,7 +306,7 @@
                 body: JSON.stringify({
                     model: model,
                     messages: [{role:'system',content:sys},{role:'user',content:text}],
-                    temperature: 0.1, // 极低温度，确保 JSON 格式稳定
+                    temperature: 0.1,
                     max_tokens: 4000
                 })
             });
@@ -290,7 +318,9 @@
 
             var json = await res.json();
             if (json.choices && json.choices.length > 0) {
-                return json.choices[0].message.content;
+                var content = json.choices[0].message.content;
+                content = content.replace(/^```.*\n/g, '').replace(/\n```$/g, '');
+                return content;
             }
             return text;
         }
