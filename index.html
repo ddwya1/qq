@@ -3,15 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡重构台 (双重精修版)</title>
+    <title>角色卡重构台 (JSON隔离版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 基础设置 */
         body { background-color: #09090b; color: #e4e4e7; font-family: sans-serif; padding-bottom: 40px; }
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
         .hidden { display: none !important; }
 
-        /* 顶部导航 */
         .navbar {
             position: sticky; top: 0; z-index: 50;
             background: rgba(24, 24, 27, 0.95); backdrop-filter: blur(12px);
@@ -19,12 +17,10 @@
             padding: 12px 16px;
             display: flex; justify-content: space-between; align-items: center;
         }
-        .nav-title { font-weight: 800; font-size: 1.1rem; color: #f472b6; } /* 粉色代表精修 */
+        .nav-title { font-weight: 800; font-size: 1.1rem; color: #34d399; } /* 绿色代表稳定 */
         
-        /* 设置面板 */
         #settingsPanel { background: #18181b; border-bottom: 1px solid #27272a; padding: 16px; display: none; }
 
-        /* 输入框与按钮 */
         .input-dark {
             background: #27272a; border: 1px solid #3f3f46; color: white;
             padding: 10px; border-radius: 8px; width: 100%; font-size: 14px; margin-bottom: 8px;
@@ -39,7 +35,6 @@
         .btn-gray { background: #3f3f46; color: white; }
         .btn-stop { background: #ef4444; color: white; padding: 4px 12px; font-size: 12px; border-radius: 20px; margin-left: 10px; }
         
-        /* 卡片样式 */
         .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
         .card-header { background: #27272a; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #a1a1aa; display: flex; justify-content: space-between; }
         
@@ -51,15 +46,9 @@
             border-top: 1px solid #27272a;
         }
         
-        /* 状态动画 */
         .highlight-change { animation: flash 1.5s; }
         @keyframes flash { 0% { background: rgba(16, 185, 129, 0.2); } 100% { background: #09090b; } }
         .upload-box { border: 2px dashed #3f3f46; border-radius: 12px; padding: 40px 20px; text-align: center; color: #71717a; margin: 16px; }
-        
-        /* 步骤指示器 */
-        .step-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-left: 5px; }
-        .step-1 { background: #eab308; color: black; } /* 黄色：改字 */
-        .step-2 { background: #3b82f6; color: white; } /* 蓝色：修格式 */
     </style>
     <script>
         window.onerror = function(msg, url, line) {
@@ -71,7 +60,7 @@
 <body>
 
     <div class="navbar">
-        <div class="nav-title">🧬 角色重构台 (双重精修)</div>
+        <div class="nav-title">🧬 角色重构台 (JSON隔离版)</div>
         <button onclick="toggleSettings()" style="font-size:20px; background:none; border:none;">⚙️</button>
     </div>
 
@@ -185,7 +174,6 @@
             }
         }
 
-        // ================= 双重处理核心逻辑 =================
         async function startAiConvert(gender) {
             if (isProcessing) return;
             var blocks = document.querySelectorAll('.text-content');
@@ -195,71 +183,76 @@
             if (document.getElementById('modelSelect').disabled || !model) return alert('请先连接API');
 
             var confirmMsg = gender === 'male' ? '转为男性 (BL/BG)' : '转为女性 (BG/GL)';
-            if (!confirm('此模式将对每段文本处理两次（1.改内容 2.修格式），速度较慢但效果最好。确认' + confirmMsg + '？')) return;
+            if (!confirm('确认' + confirmMsg + '？')) return;
 
             isProcessing = true;
             shouldStop = false;
             document.getElementById('aiStatus').classList.remove('hidden');
+            document.getElementById('statusText').innerText = "准备中...";
             
             var target = gender === 'male' ? '男性' : '女性';
             var avoid = gender === 'male' ? '她' : '他';
             var want = gender === 'male' ? '他' : '她';
 
-            // 步骤 1 提示词：只管改内容，允许格式乱
-            var promptStep1 = 
-                "你是一个小说重写工具。任务：\n" +
-                "1. 将User性别改为【" + target + "】。\n" +
-                "2. 将代词【" + avoid + "】改为【" + want + "】。\n" +
-                "3. 【NSFW/生理重构】：根据" + target + "的生理结构修改器官和动作描写（如将女性特征改为男性特征）。\n" +
-                "4. 保持剧情不变，直接输出修改后的文本。";
+            // 【JSON 隔离 Prompt】
+            // 核心思路：让 AI 处理 JSON 数组，这样它就碰不到换行符了
+            var prompt = 
+                "你是一个JSON数组处理器。你不仅要修改性别，还要根据新性别修改生理特征和动作描写。\n" +
+                "【任务】：\n" +
+                "1. 接收一个字符串数组。\n" +
+                "2. 遍历数组中的每个字符串，将指代User的词汇改为【" + target + "】，代词【" + avoid + "】改为【" + want + "】。\n" +
+                "3. 【重点】：识别User是" + target + "，遇到色情/互动描写，必须修改器官和动作以符合解剖学逻辑（如将女性特征改为男性特征）。\n" +
+                "4. 严禁修改 XML 标签（如 <tag>）。\n" +
+                "5. 返回一个标准的 JSON 字符串数组，长度必须与输入一致。\n" +
+                "6. 不要输出 Markdown 代码块，直接输出 JSON。";
 
             var count = 0;
             for (var i = 0; i < blocks.length; i++) {
                 if (shouldStop) { alert('已停止'); break; }
 
                 var block = blocks[i];
-                var originalTxt = block.textContent; // 保留最原始的文本作为格式模板
-                if (!originalTxt || !originalTxt.trim()) continue;
+                var txt = block.textContent;
+                if (!txt || !txt.trim()) continue;
 
                 count++;
-                block.parentElement.style.opacity = '0.6';
+                document.getElementById('statusText').innerText = "处理中 " + count + "/" + blocks.length;
+                block.parentElement.style.opacity = '0.5';
+
+                // 【核心：JSON 切割】
+                // 1. 按换行符切割成数组
+                var lines = txt.split('\n');
+                var jsonPayload = JSON.stringify(lines);
 
                 try {
-                    // --- 第一步：改内容 ---
-                    document.getElementById('statusText').innerText = "处理 " + count + "/" + blocks.length + " [1.改字]";
-                    var modifiedTxt = await callAi(originalTxt, promptStep1, model);
+                    var jsonResponse = await callAi(jsonPayload, prompt, model);
                     
-                    if (shouldStop) break;
+                    if (shouldStop) { block.parentElement.style.opacity = '1'; alert('已停止'); break; }
 
-                    // --- 第二步：修格式 ---
-                    // 这一步是把“改好的字”填进“原来的格式”里
-                    if (modifiedTxt && modifiedTxt !== originalTxt) {
-                        document.getElementById('statusText').innerText = "处理 " + count + "/" + blocks.length + " [2.排版]";
-                        
-                        var promptStep2 = 
-                            "你是一个【格式对齐引擎】。任务是将【新内容】填充回【原模板】的格式中。\n" +
-                            "【原模板】：\n" + originalTxt + "\n\n" +
-                            "【新内容】：\n" + modifiedTxt + "\n\n" +
-                            "【指令】：\n" +
-                            "1. 输出内容必须是【新内容】的文字。\n" +
-                            "2. 输出格式（换行、空格、XML标签位置）必须和【原模板】一模一样！\n" +
-                            "3. 如果原模板有 <标签>，输出也必须有，且位置一致。\n" +
-                            "4. 严禁合并段落！严禁删除换行符！\n" +
-                            "5. 直接输出最终结果。";
+                    if (jsonResponse) {
+                        try {
+                            // 尝试解析返回的 JSON
+                            // 有时候 AI 会加 ```json ... ```，先清洗一下
+                            var cleanJson = jsonResponse.replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+                            var newLines = JSON.parse(cleanJson);
 
-                        var finalTxt = await callAi("请执行格式对齐", promptStep2, model);
-
-                        if (shouldStop) break;
-
-                        if (finalTxt) {
-                            // 最终兜底：防止 AI 在第二步还是把 XML 标签粘连了
-                            finalTxt = finalTxt.replace(/>\s*</g, ">\n<");
-                            
-                            block.textContent = finalTxt;
-                            block.classList.add('highlight-change');
-                            (function(el) {
-                                setTimeout(function() { el.classList.remove('highlight-change'); }, 1500);
-                            })(block);
+                            if (Array.isArray(newLines)) {
+                                // 【核心：物理还原】
+                                // 将数组重新拼回字符串，换行符由我们控制，AI 无法干涉
+                                var newTxt = newLines.join('\n');
+                                
+                                if (newTxt !== txt) {
+                                    block.textContent = newTxt;
+                                    block.classList.add('highlight-change');
+                                    (function(el) {
+                                        setTimeout(function() { el.classList.remove('highlight-change'); }, 1500);
+                                    })(block);
+                                }
+                            } else {
+                                console.error("AI 返回的不是数组");
+                            }
+                        } catch (parseErr) {
+                            console.error("JSON 解析失败", parseErr);
+                            // 如果 JSON 解析失败，说明 AI 没听话，这里可以加个兜底，或者直接跳过
                         }
                     }
                 } catch (e) {
@@ -287,7 +280,7 @@
                 body: JSON.stringify({
                     model: model,
                     messages: [{role:'system',content:sys},{role:'user',content:text}],
-                    temperature: 0.1,
+                    temperature: 0.1, // 极低温度保证 JSON 格式正确
                     max_tokens: 4000
                 })
             });
@@ -299,9 +292,7 @@
 
             var json = await res.json();
             if (json.choices && json.choices.length > 0) {
-                var content = json.choices[0].message.content;
-                content = content.replace(/^```.*\n/g, '').replace(/\n```$/g, '');
-                return content;
+                return json.choices[0].message.content;
             }
             return text;
         }
