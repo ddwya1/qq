@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SillyTavern 角色卡性别转换工具 (修复版)</title>
+    <title>SillyTavern 角色卡性别转换工具 (终极版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * { -webkit-tap-highlight-color: transparent; }
@@ -351,6 +351,12 @@
         }
 
         function togglePause() {
+            // 如果任务已经全部完成，点击暂停按钮变成手动触发完成
+            if (state.completedCount === state.totalCount && state.totalCount > 0) {
+                onAllFinished();
+                return;
+            }
+            
             state.isPaused = !state.isPaused;
             var btn = document.getElementById('pauseBtn');
             btn.textContent = state.isPaused ? '▶️ 继续' : '⏸️ 暂停';
@@ -372,8 +378,12 @@
         }
 
         function processQueue(apiUrl, apiKey, modelName) {
-            if (state.isPaused) return;
+            // 修复 Bug：优先检查是否全部完成，而不是先检查是否暂停
+            // 这样即使在最后时刻暂停，或者有竞态条件，也能保证触发结算
             if (state.completedCount === state.totalCount) { onAllFinished(); return; }
+            
+            if (state.isPaused) return;
+            
             while (state.activeTasks < state.maxConcurrency && !state.isPaused) {
                 var task = state.tasks.find(function(t) { return t.status === 'pending'; });
                 if (!task) break;
@@ -406,16 +416,31 @@
                 document.getElementById('retryBtn').classList.remove('hidden');
                 showToast('部分任务失败，请检查并重试', 'error');
             } else {
-                // 强制显示导出，哪怕预览失败
+                // 强制显示导出，无论预览是否成功
                 document.getElementById('exportSection').classList.remove('hidden');
-                document.getElementById('controlPanel').classList.add('hidden');
-                document.getElementById('convertBtn').textContent = '✅ 转换成功 (点击刷新)';
-                document.getElementById('convertBtn').classList.remove('hidden');
-                document.getElementById('convertBtn').disabled = false;
-                document.getElementById('convertBtn').onclick = function() { location.reload(); };
                 
+                // 隐藏控制面板（包括暂停按钮）
+                document.getElementById('controlPanel').classList.add('hidden');
+                
+                // 显示重新开始按钮
+                var restartBtn = document.getElementById('convertBtn');
+                restartBtn.textContent = '✅ 转换成功 (点击刷新)';
+                restartBtn.classList.remove('hidden');
+                restartBtn.disabled = false;
+                restartBtn.onclick = function() { location.reload(); };
+                
+                // 尝试生成预览，即使失败也不影响导出
                 try { showDiffPreview(); } catch(e) { console.error('预览生成失败', e); }
+                
                 showToast('所有任务转换完成！', 'success');
+            }
+            
+            // 兜底：如果因为某种原因暂停按钮还在，把它改成强制结算按钮
+            if (!document.getElementById('controlPanel').classList.contains('hidden')) {
+                 var pauseBtn = document.getElementById('pauseBtn');
+                 pauseBtn.textContent = '✅ 完成并导出';
+                 pauseBtn.className = 'btn-primary py-3 text-lg font-semibold';
+                 // togglePause 已经处理了点击逻辑
             }
         }
 
@@ -455,26 +480,19 @@
                 { key: 'personality', label: '性格特征' }, { key: 'system_prompt', label: '系统提示词' }
             ];
             
-            // 安全地遍历备用问候
             if (orig.alternate_greetings && Array.isArray(orig.alternate_greetings)) {
-                orig.alternate_greetings.forEach(function(_, i) {
-                    fields.push({ key: 'alt', idx: i, label: '备用问候 '+(i+1) });
-                });
+                orig.alternate_greetings.forEach(function(_, i) { fields.push({ key: 'alt', idx: i, label: '备用问候 '+(i+1) }); });
             }
-            
-            // 安全地遍历世界书
             if (orig.character_book && orig.character_book.entries && Array.isArray(orig.character_book.entries)) {
-                orig.character_book.entries.forEach(function(_, i) {
-                    fields.push({ key: 'book', idx: i, label: '世界书 '+(i+1) });
-                });
+                orig.character_book.entries.forEach(function(_, i) { fields.push({ key: 'book', idx: i, label: '世界书 '+(i+1) }); });
             }
 
             fields.forEach(function(f) {
                 var oTxt = '', cTxt = '';
                 try {
                     if(f.key === 'alt') { 
-                        oTxt = orig.alternate_greetings[f.idx] || ''; 
-                        cTxt = conv.alternate_greetings[f.idx] || ''; 
+                        oTxt = orig.alternate_greetings && orig.alternate_greetings[f.idx] ? orig.alternate_greetings[f.idx] : ''; 
+                        cTxt = conv.alternate_greetings && conv.alternate_greetings[f.idx] ? conv.alternate_greetings[f.idx] : ''; 
                     } else if(f.key === 'book') { 
                         oTxt = orig.character_book.entries[f.idx] ? orig.character_book.entries[f.idx].content : ''; 
                         cTxt = conv.character_book.entries[f.idx] ? conv.character_book.entries[f.idx].content : ''; 
