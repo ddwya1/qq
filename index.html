@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SillyTavern 角色卡性别转换 (全域扫描版)</title>
+    <title>SillyTavern 角色卡性别转换 (强力修正版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         * { -webkit-tap-highlight-color: transparent; }
@@ -31,7 +31,7 @@
 <body class="p-4 pb-20 max-w-2xl mx-auto">
     <div class="text-center mb-6">
         <h1 class="text-2xl font-bold text-blue-400">🔍 全域角色卡重构工具</h1>
-        <p class="text-xs text-gray-500 mt-1">深度递归扫描 · 世界书无死角覆盖</p>
+        <p class="text-xs text-gray-500 mt-1">强力修正模式 · 专治改不动</p>
     </div>
 
     <!-- API 设置 -->
@@ -117,7 +117,7 @@
             const tasks = [];
             const d = data.data || data; // 兼容 wrap
 
-            // 1. 基础字段 (Core Fields)
+            // 1. 基础字段
             const coreFields = [
                 'description', 'first_mes', 'scenario', 'mes_example', 
                 'personality', 'system_prompt', 'post_history_instructions', 
@@ -130,7 +130,7 @@
                 }
             });
 
-            // 2. 数组字段 (Arrays)
+            // 2. 数组字段
             if (Array.isArray(d.alternate_greetings)) {
                 d.alternate_greetings.forEach((v, i) => {
                     if (v && v.trim()) tasks.push({ path: ['alternate_greetings', i], name: `备用问候 ${i+1}`, val: v, status: 'pending' });
@@ -142,7 +142,7 @@
                 });
             }
 
-            // 3. 世界书 (World Info / Character Book)
+            // 3. 世界书
             const book = d.character_book || d.lorebook;
             if (book && book.entries && Array.isArray(book.entries)) {
                 book.entries.forEach((entry, i) => {
@@ -304,14 +304,10 @@
         function parseData(str) {
             try {
                 try { state.orig = JSON.parse(str); } catch { state.orig = JSON.parse(atob(str)); }
-                
-                // 预扫描
                 state.tasks = deepScan(state.orig);
-                
                 const name = state.orig.data?.name || state.orig.name || '未知角色';
                 document.getElementById('fileInfo').innerHTML = `<div class="text-xl">📄</div><div class="font-bold">${name}</div>`;
                 
-                // 显示扫描报告
                 const report = document.getElementById('scanDetails');
                 const counts = { core: 0, book: 0, alt: 0 };
                 state.tasks.forEach(t => {
@@ -319,7 +315,6 @@
                     else if (t.path[0].includes('greetings')) counts.alt++;
                     else counts.core++;
                 });
-                // 修复了这里的模板字符串语法
                 report.innerText = `发现 \({state.tasks.length} 个任务：基础字段 \){counts.core} | 问候语 \({counts.alt} | 世界书 \){counts.book}`;
                 document.getElementById('scanReport').classList.remove('hidden');
 
@@ -334,7 +329,7 @@
             if (ready) { btn.classList.remove('hidden'); btn.disabled = false; } else { btn.classList.add('hidden'); }
         }
 
-        // --- 转换 ---
+        // --- 转换 (强力修正版) ---
         function start() {
             document.getElementById('startBtn').classList.add('hidden');
             document.getElementById('controlPanel').classList.remove('hidden');
@@ -378,7 +373,6 @@
             }
             const pct = (state.done / state.total) * 100;
             document.getElementById('bar').style.width = `${pct}%`;
-            // 修复了这里的模板字符串语法
             document.getElementById('progressText').innerText = `\({state.done}/\){state.total}`;
             if (state.done === state.total) finish();
         }
@@ -398,25 +392,36 @@
             state.active++;
             updateStatus(idx, 'processing');
             
-            // 修复了 URL 构建逻辑
             let url = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
             if (!url.endsWith('/chat/completions')) url += '/chat/completions';
             
             const key = document.getElementById('apiKey').value;
             const model = document.getElementById('modelSelect').value;
-            const target = state.gender === 'male' ? '男性' : '女性';
             
-            const prompt = `你是一个专业的语义重构引擎。
-任务：修改文本，将其中【属于用户({{user}})】的性别特征修改为【${target}】。
+            // 设定目标
+            const isToMale = state.gender === 'male';
+            const targetGender = isToMale ? '男性' : '女性';
+            const targetPronoun = isToMale ? '他' : '她';
+            const avoidPronoun = isToMale ? '她' : '他';
 
-⚠️ 核心逻辑：
-1. **实体追踪**：分析文中的代词（他/她/它）和名词，判断是指代角色({{char}})还是用户({{user}})。只修改指代用户的部分。
-2. **解剖学适配**：
-   - 若目标为男：将指代用户的“乳房/花穴/湿了”等，根据动作逻辑修改为男性的“胸肌/后穴/肠液/前列腺液”或“阴茎/勃起”。
-   - 若目标为女：将指代用户的男性特征修改为女性对应器官。
-   - 必须修改，不要回避敏感词。
-3. **风格保留**：严禁修改标点、格式、Markdown。不改剧情。
-4. **输出**：直接输出修改后的完整文本。`;
+            // 🔥 强力修正 Prompt
+            const prompt = `你是一个小说重写工具。
+【任务】：将片段中所有指代【对话对象/伴侣/暗恋对象/另一方】的词汇，强制修改为【${targetGender}】。
+
+【当前目标】：将用户(User)转为 ${targetGender}。
+
+【强制执行规则】：
+1. **代词大清洗**：
+   - 只要文中出现“\({avoidPronoun}”（\){isToMale ? '她' : '他'}），且语境上是指代主角关注的那个**人**（而非主角的亲戚或路人），**必须**改为“${targetPronoun}”。
+   - 哪怕文中没有出现 {{user}} 标签，只要是主角在回忆、对话、心理活动中想念的“那个人”，一律视为用户，必须修改性别！
+
+2. **生理特征替换**（必须执行）：
+   - ${isToMale ? '将“乳房/花穴/湿了/小腹/裙子”等女性特征，改为男性的“胸膛/后穴/前列腺液/腹肌/裤子”等。' : '将男性特征修改为女性对应器官。'}
+   - 遇到“那个人”、“那家伙”等模糊称呼，如果后面跟着性别特征描写，也要适配修改。
+
+3. **输出要求**：
+   - 严禁解释，严禁废话。
+   - 保持原格式，只输出修改后的正文。`;
 
             try {
                 const res = await fetch(url, {
@@ -424,8 +429,12 @@
                     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
                     body: JSON.stringify({
                         model: model,
-                        messages: [ { role: 'system', content: prompt }, { role: 'user', content: task.val } ],
-                        temperature: 0.3, max_tokens: 8192
+                        messages: [ 
+                            { role: 'system', content: prompt }, 
+                            { role: 'user', content: `待修改文本：\n${task.val}` } 
+                        ],
+                        temperature: 0.1, // 降低温度以保证指令执行
+                        max_tokens: 8192
                     })
                 });
 
@@ -437,7 +446,10 @@
                 }
                 
                 const json = await res.json();
-                const newText = json.choices[0].message.content;
+                let newText = json.choices[0].message.content;
+                
+                // 清理可能的废话
+                newText = newText.replace(/^修改后[：:]\s*/i, '').replace(/^Here is the rewritten text[：:]\s*/i, '');
 
                 let ptr = state.conv.data || state.conv;
                 if (task.path[0] === 'character_book' && !ptr.character_book && state.conv.character_book) {
@@ -512,7 +524,6 @@
                 const newVal = ptr[t.path[t.path.length - 1]];
 
                 if (t.status === 'done' && t.val !== newVal) {
-                    // 修复了这里的模板字符串语法
                     diffHtml += `\n=== \({t.name} ===\n[原]: \){t.val.substring(0, 60)}...\n[新]: ${newVal.substring(0, 60)}...\n`;
                 }
             });
@@ -521,7 +532,6 @@
 
         function exportFile(type) {
             const suffix = state.gender === 'male' ? 'MaleUser' : 'FemaleUser';
-            // 修复了这里的模板字符串语法
             const name = `\({state.fname}_\){suffix}.${type}`;
             if (type === 'json') {
                 const blob = new Blob([JSON.stringify(state.conv, null, 2)], {type: 'application/json'});
