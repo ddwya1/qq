@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡重构台 (带停止功能)</title>
+    <title>角色卡重构台 (格式完美版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* 基础设置 */
@@ -43,10 +43,11 @@
         .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
         .card-header { background: #27272a; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #a1a1aa; display: flex; justify-content: space-between; }
         
-        /* 核心修复：强制保留格式 */
+        /* 核心修复：强制保留格式，解决挤成一坨的问题 */
         .text-content {
             background: #09090b; color: #d4d4d8; padding: 14px; 
             font-family: monospace; font-size: 13px; line-height: 1.6;
+            /* 关键：保留换行和空格 */
             white-space: pre-wrap; 
             word-wrap: break-word;
             border-top: 1px solid #27272a;
@@ -84,15 +85,14 @@
         <div class="bg-[#18181b] p-3 rounded-xl border border-[#27272a]">
             <div class="flex justify-between items-center mb-2">
                 <span class="text-xs font-bold text-blue-400">AI 智能改写</span>
-                <!-- 状态显示区域，包含停止按钮 -->
                 <div id="aiStatus" class="hidden flex items-center">
                     <span id="statusText" class="text-xs text-yellow-500">处理中...</span>
                     <button onclick="stopAiConvert()" class="btn-stop">⏹️ 停止</button>
                 </div>
             </div>
             <div class="flex gap-2">
-                <button onclick="startAiConvert('male')" class="btn btn-blue">♂ 转男</button>
-                <button onclick="startAiConvert('female')" class="btn btn-red">♀ 转女</button>
+                <button onclick="startAiConvert('male')" class="btn btn-blue">♂ 转男 (BL/BG)</button>
+                <button onclick="startAiConvert('female')" class="btn btn-red">♀ 转女 (BG/GL)</button>
             </div>
         </div>
 
@@ -173,7 +173,7 @@
         }
 
         var isProcessing = false;
-        var shouldStop = false; // 停止标志
+        var shouldStop = false;
 
         function stopAiConvert() {
             if (isProcessing) {
@@ -190,33 +190,39 @@
             var model = document.getElementById('modelSelect').value;
             if (document.getElementById('modelSelect').disabled || !model) return alert('请先连接API');
 
-            var confirmMsg = gender === 'male' ? '转为男性' : '转为女性';
+            var confirmMsg = gender === 'male' ? '转为男性 (BL/BG)' : '转为女性 (BG/GL)';
             if (!confirm('确认' + confirmMsg + '？')) return;
 
             isProcessing = true;
-            shouldStop = false; // 重置停止标志
+            shouldStop = false;
             document.getElementById('aiStatus').classList.remove('hidden');
             document.getElementById('statusText').innerText = "准备中...";
             
             var target = gender === 'male' ? '男性' : '女性';
             var avoid = gender === 'male' ? '她' : '他';
             var want = gender === 'male' ? '他' : '她';
+            var anatomy = gender === 'male' ? '男性器官(如阴茎/后穴/前列腺)' : '女性器官(如阴道/乳房)';
 
-            var prompt = "你是一个【严格格式保留】的文本替换工具。\n" +
-                         "任务：将指代User的词汇改为【" + target + "】，将【" + avoid + "】改为【" + want + "】，并修改对应生理特征。\n" +
-                         "⚠️ 绝对禁止的操作：\n" +
-                         "1. 禁止合并段落！禁止删除换行符！\n" +
-                         "2. 禁止修改Markdown格式（如 - * # 等符号）。\n" +
-                         "3. 保持原文的列表结构和缩进。\n" +
-                         "4. 只输出修改后的文本，不要任何废话。";
+            // 增强版 Prompt：包含格式保留指令 + BL/NSFW 逻辑
+            var prompt = 
+                "你是一个专业的【角色卡重构专家】。\n" +
+                "【任务目标】：\n" +
+                "1. 将文中针对【User/用户】的描写改为【" + target + "】。\n" +
+                "2. 替换代词：将指代User的“" + avoid + "”改为“" + want + "”。\n" +
+                "3. 【生理/NSFW重构】：\n" +
+                "   - 识别User的新性别为" + target + "。\n" +
+                "   - 如果涉及色情/互动描写，必须修改器官和动作以符合解剖学逻辑。\n" +
+                "   - 例如：若转为男性，将“花穴/湿了”改为“后穴/肠液/勃起”；若转为女性则反之。\n" +
+                "   - 保持原文的色情程度，不要和谐，但要符合新性别。\n" +
+                "【严格格式要求】：\n" +
+                "1. ⚠️ 严禁删除换行符！严禁合并段落！\n" +
+                "2. 必须保留原文的 XML 标签（如 <character_information>）、列表符号、缩进。\n" +
+                "3. 不要修改 {{user}} 和 {{char}} 占位符本身，只修改周围的描述。\n" +
+                "4. 只输出修改后的正文，不要任何解释。";
 
             var count = 0;
             for (var i = 0; i < blocks.length; i++) {
-                // 检查是否需要停止
-                if (shouldStop) {
-                    alert('已停止处理');
-                    break;
-                }
+                if (shouldStop) { alert('已停止'); break; }
 
                 var block = blocks[i];
                 var txt = block.textContent;
@@ -229,12 +235,7 @@
                 try {
                     var newTxt = await callAi(txt, prompt, model);
                     
-                    // 再次检查是否停止（防止在等待API期间点了停止）
-                    if (shouldStop) {
-                        block.parentElement.style.opacity = '1';
-                        alert('已停止处理');
-                        break;
-                    }
+                    if (shouldStop) { block.parentElement.style.opacity = '1'; alert('已停止'); break; }
 
                     if (newTxt && newTxt !== txt) {
                         block.textContent = newTxt;
@@ -280,7 +281,10 @@
 
             var json = await res.json();
             if (json.choices && json.choices.length > 0) {
-                return json.choices[0].message.content;
+                // 移除可能存在的 Markdown 代码块包裹
+                var content = json.choices[0].message.content;
+                content = content.replace(/^```.*\n/g, '').replace(/\n```$/g, '');
+                return content;
             }
             return text;
         }
