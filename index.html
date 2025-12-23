@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡重构台 (兼容修复版)</title>
+    <title>角色卡重构台 (带停止功能)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         /* 基础设置 */
@@ -37,26 +37,29 @@
         .btn-blue { background: #2563eb; color: white; }
         .btn-red { background: #dc2626; color: white; }
         .btn-gray { background: #3f3f46; color: white; }
+        .btn-stop { background: #ef4444; color: white; padding: 4px 12px; font-size: 12px; border-radius: 20px; margin-left: 10px; }
         
         /* 卡片样式 */
         .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
         .card-header { background: #27272a; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #a1a1aa; display: flex; justify-content: space-between; }
+        
+        /* 核心修复：强制保留格式 */
         .text-content {
             background: #09090b; color: #d4d4d8; padding: 14px; 
-            font-family: monospace; font-size: 13px; line-height: 1.5;
-            white-space: pre-wrap; word-break: break-all; border-top: 1px solid #27272a;
+            font-family: monospace; font-size: 13px; line-height: 1.6;
+            white-space: pre-wrap; 
+            word-wrap: break-word;
+            border-top: 1px solid #27272a;
         }
         
         /* 状态动画 */
         .highlight-change { animation: flash 1.5s; }
         @keyframes flash { 0% { background: rgba(16, 185, 129, 0.2); } 100% { background: #09090b; } }
-        .processing { opacity: 0.6; border-left: 3px solid #f59e0b; }
         .upload-box { border: 2px dashed #3f3f46; border-radius: 12px; padding: 40px 20px; text-align: center; color: #71717a; margin: 16px; }
     </style>
     <script>
-        // 全局错误捕捉：如果代码报错，直接弹窗
         window.onerror = function(msg, url, line) {
-            alert("系统错误:\n" + msg + "\n行号: " + line);
+            alert("错误:\n" + msg + "\n行: " + line);
             return false;
         };
     </script>
@@ -79,9 +82,13 @@
 
     <div class="p-4 flex flex-col gap-3">
         <div class="bg-[#18181b] p-3 rounded-xl border border-[#27272a]">
-            <div class="flex justify-between mb-2">
+            <div class="flex justify-between items-center mb-2">
                 <span class="text-xs font-bold text-blue-400">AI 智能改写</span>
-                <span id="aiStatus" class="text-xs text-yellow-500 hidden">处理中...</span>
+                <!-- 状态显示区域，包含停止按钮 -->
+                <div id="aiStatus" class="hidden flex items-center">
+                    <span id="statusText" class="text-xs text-yellow-500">处理中...</span>
+                    <button onclick="stopAiConvert()" class="btn-stop">⏹️ 停止</button>
+                </div>
             </div>
             <div class="flex gap-2">
                 <button onclick="startAiConvert('male')" class="btn btn-blue">♂ 转男</button>
@@ -121,7 +128,6 @@
             panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
         }
 
-        // ================= API 逻辑 =================
         async function loadModels() {
             var rawUrl = document.getElementById('apiUrl').value.trim();
             if (!rawUrl) return alert('请先填写 API URL');
@@ -166,46 +172,73 @@
             }
         }
 
-        // ================= AI 逻辑 (兼容版) =================
         var isProcessing = false;
+        var shouldStop = false; // 停止标志
+
+        function stopAiConvert() {
+            if (isProcessing) {
+                shouldStop = true;
+                document.getElementById('statusText').innerText = "正在停止...";
+            }
+        }
 
         async function startAiConvert(gender) {
-            // 调试检查
             if (isProcessing) return;
             var blocks = document.querySelectorAll('.text-content');
-            if (blocks.length === 0) return alert('请先上传文件，页面没有内容！');
+            if (blocks.length === 0) return alert('请先上传文件');
 
             var model = document.getElementById('modelSelect').value;
-            if (document.getElementById('modelSelect').disabled || !model) return alert('请先连接API并选择模型');
+            if (document.getElementById('modelSelect').disabled || !model) return alert('请先连接API');
 
             var confirmMsg = gender === 'male' ? '转为男性' : '转为女性';
             if (!confirm('确认' + confirmMsg + '？')) return;
 
             isProcessing = true;
+            shouldStop = false; // 重置停止标志
             document.getElementById('aiStatus').classList.remove('hidden');
+            document.getElementById('statusText').innerText = "准备中...";
             
             var target = gender === 'male' ? '男性' : '女性';
             var avoid = gender === 'male' ? '她' : '他';
             var want = gender === 'male' ? '他' : '她';
 
-            var prompt = "你是一个文本重写工具。任务：\n1. 将文中指代【用户/User】的性别改为【" + target + "】。\n2. 必须将代词“" + avoid + "”改为“" + want + "”。\n3. 必须修改生理特征（如胸部/生殖器）以匹配" + target + "。\n4. 遇到色情描写，必须根据解剖学逻辑修改。\n5. 严禁修改剧情和格式，严禁解释。直接输出结果。";
+            var prompt = "你是一个【严格格式保留】的文本替换工具。\n" +
+                         "任务：将指代User的词汇改为【" + target + "】，将【" + avoid + "】改为【" + want + "】，并修改对应生理特征。\n" +
+                         "⚠️ 绝对禁止的操作：\n" +
+                         "1. 禁止合并段落！禁止删除换行符！\n" +
+                         "2. 禁止修改Markdown格式（如 - * # 等符号）。\n" +
+                         "3. 保持原文的列表结构和缩进。\n" +
+                         "4. 只输出修改后的文本，不要任何废话。";
 
             var count = 0;
             for (var i = 0; i < blocks.length; i++) {
+                // 检查是否需要停止
+                if (shouldStop) {
+                    alert('已停止处理');
+                    break;
+                }
+
                 var block = blocks[i];
                 var txt = block.textContent;
                 if (!txt || !txt.trim()) continue;
 
                 count++;
-                document.getElementById('aiStatus').innerText = "处理中 " + count + "/" + blocks.length;
+                document.getElementById('statusText').innerText = "处理中 " + count + "/" + blocks.length;
                 block.parentElement.style.opacity = '0.5';
 
                 try {
                     var newTxt = await callAi(txt, prompt, model);
+                    
+                    // 再次检查是否停止（防止在等待API期间点了停止）
+                    if (shouldStop) {
+                        block.parentElement.style.opacity = '1';
+                        alert('已停止处理');
+                        break;
+                    }
+
                     if (newTxt && newTxt !== txt) {
                         block.textContent = newTxt;
                         block.classList.add('highlight-change');
-                        // 使用闭包解决 setTimeout 引用问题
                         (function(el) {
                             setTimeout(function() { el.classList.remove('highlight-change'); }, 1500);
                         })(block);
@@ -219,7 +252,8 @@
 
             isProcessing = false;
             document.getElementById('aiStatus').classList.add('hidden');
-            alert('处理完成');
+            if (!shouldStop) alert('处理完成');
+            shouldStop = false;
         }
 
         async function callAi(text, sys, model) {
@@ -246,12 +280,11 @@
 
             var json = await res.json();
             if (json.choices && json.choices.length > 0) {
-                return json.choices[0].message.content.trim();
+                return json.choices[0].message.content;
             }
             return text;
         }
 
-        // ================= 手动替换 =================
         function applyManualReplace() {
             var f = document.getElementById('findText').value;
             var r = document.getElementById('replaceText').value;
@@ -274,7 +307,6 @@
             alert('已替换 ' + n + ' 处');
         }
 
-        // ================= 文件解析 (兼容版) =================
         function handleFile(file) {
             if (!file) return;
             var reader = new FileReader();
@@ -313,7 +345,6 @@
                 var cBox = document.getElementById('charContainer'); cBox.innerHTML = '';
                 var wBox = document.getElementById('worldContainer'); wBox.innerHTML = '';
 
-                // 基础字段
                 var map = [['description','描述'], ['first_mes','开场白'], ['personality','性格'], ['scenario','场景'], ['mes_example','示例'], ['system_prompt','系统提示'], ['post_history_instructions','后指令']];
                 
                 map.forEach(function(item) {
@@ -328,7 +359,6 @@
                     data.group_only_greetings.forEach(function(v,i) { addCard(cBox, '群聊 #'+(i+1), v); });
                 }
 
-                // 世界书 (使用 && 代替 ?.)
                 var books = [];
                 if (data.character_book && data.character_book.entries) books = data.character_book.entries;
                 else if (d.character_book && d.character_book.entries) books = d.character_book.entries;
@@ -385,15 +415,9 @@
                     if(dec.decode(d.slice(0, split)) === 'chara') {
                         if (type === 'tEXt') return dec.decode(d.slice(split+1));
                         else {
-                            // 简化版 iTXt 提取，跳过头部
-                            var sub = d.slice(split+1); 
-                            var idx = sub.indexOf(0); // compFlag, method, lang...
-                            // 暴力跳过：直接找最后一个 null 后的内容，通常是安全的
-                            // 或者直接返回 sub.slice(idx+...)，这里用更安全的方法：
-                            // iTXt 结构: key \0 flag method lang \0 transKey \0 text
-                            var p2 = split + 3; // skip flag(1) method(1)
-                            while (p2 < d.length && d[p2] !== 0) p2++; p2++; // lang
-                            while (p2 < d.length && d[p2] !== 0) p2++; p2++; // transKey
+                            var p2 = split + 3;
+                            while (p2 < d.length && d[p2] !== 0) p2++; p2++;
+                            while (p2 < d.length && d[p2] !== 0) p2++; p2++;
                             return dec.decode(d.slice(p2));
                         }
                     }
