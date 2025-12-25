@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡打包助手 (AI专用版)</title>
+    <title>角色卡打包助手 (防乱码修复版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #09090b; color: #e4e4e7; font-family: sans-serif; padding-bottom: 40px; }
         * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
         .hidden { display: none !important; }
 
-        /* 顶部导航 */
         .navbar {
             position: sticky; top: 0; z-index: 50;
             background: rgba(24, 24, 27, 0.95); backdrop-filter: blur(12px);
@@ -20,7 +19,6 @@
         }
         .nav-title { font-weight: 800; font-size: 1.1rem; color: #a78bfa; }
         
-        /* 导出区域 */
         .export-box {
             background: #18181b; border: 1px solid #8b5cf6; 
             border-radius: 12px; padding: 16px; margin: 16px;
@@ -28,7 +26,6 @@
             box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15);
         }
 
-        /* 按钮 */
         .btn {
             display: flex; justify-content: center; align-items: center;
             padding: 12px 20px; border-radius: 8px; font-weight: 600; font-size: 15px;
@@ -39,7 +36,6 @@
         .btn-purple { background: #7c3aed; color: white; }
         .btn-copy-sm { background: #374151; color: white; padding: 4px 10px; font-size: 12px; width: auto; }
 
-        /* 卡片样式 */
         .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
         .card-header { 
             background: #27272a; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #a1a1aa; 
@@ -64,13 +60,12 @@
         <div class="nav-title">🧬 角色卡打包助手</div>
     </div>
 
-    <!-- 1. 导出区域 (默认隐藏，上传后显示) -->
+    <!-- 1. 导出区域 -->
     <div id="exportArea" class="hidden">
         <div class="export-box">
-            <div class="text-sm font-bold text-purple-400 mb-2">🚀 准备就绪</div>
-            <p class="text-xs text-gray-400 mb-3">已提取所有内容并附带 BL/NSFW 改写指令</p>
-            <button class="btn btn-purple" onclick="downloadForAI()">📥 下载 TXT 发给 AI</button>
-            <p class="text-[10px] text-gray-500 mt-2">提示：下载后直接把文件拖给 ChatGPT/Claude 即可</p>
+            <div class="text-sm font-bold text-purple-400 mb-2">🚀 解析成功</div>
+            <p class="text-xs text-gray-400 mb-3">已提取全部内容 + 注入BL改写指令</p>
+            <button class="btn btn-purple" onclick="downloadForAI()">📥 下载 .txt (发给AI)</button>
         </div>
     </div>
 
@@ -81,45 +76,40 @@
         <div class="text-sm">点击上传角色卡 (PNG/JSON)</div>
     </div>
 
-    <!-- 3. 内容预览列表 -->
+    <!-- 3. 预览区域 -->
     <div id="contentArea" class="hidden px-4 pb-10">
-        <div class="text-xs font-bold text-gray-500 mb-2 mt-4 uppercase">预览内容 (可单独复制)</div>
+        <div class="text-xs font-bold text-gray-500 mb-2 mt-4 uppercase">预览内容</div>
         <div id="charContainer"></div>
-
         <div class="flex justify-between items-end mb-2 mt-6">
-            <div class="text-xs font-bold text-gray-500 uppercase">世界书 / 知识库</div>
+            <div class="text-xs font-bold text-gray-500 uppercase">世界书</div>
             <div id="worldCount" class="text-xs text-gray-600"></div>
         </div>
         <div id="worldContainer"></div>
     </div>
 
     <script>
-        // 全局变量存储解析后的数据
-        let globalData = null;
-        let globalFileName = "character";
+        var globalData = null;
+        var globalFileName = "character";
 
-        // --- 核心：打包下载功能 ---
+        // --- 核心：打包下载 (修复乱码和变量不显示) ---
         function downloadForAI() {
             if (!globalData) return alert('没有数据');
 
-            // 1. 准备提示词 (BL/NSFW 专用)
-            let content = `【指令】：你是一个专业的BL小说改写助手。请读取下方的角色卡数据，并执行以下修改任务：
-1. 【核心任务】：将User的性别设定为【男性】，将指代User的代词改为“他”。
-2. 【NSFW/生理修正】：
-   - 识别这是两个男性的互动。
-   - 如果文中有色情/亲密描写，必须根据【男性生理构造】修改器官和动作（例如：将女性特征改为后穴、肠液、前列腺、勃起等）。
-   - 如果没有色情内容，则只修改性别代词。
-3. 【格式死命令】：
-   - 必须保留所有的 XML 标签（如 <tag>）和列表符号。
-   - 严禁删除换行符！严禁合并段落！
-   - 请按顺序输出修改后的内容，并保留原来的【标题】以便我区分。
+            // 使用最原始的字符串拼接，防止 ${} 失效
+            var content = "【指令】：你是一个专业的BL小说改写助手。请读取下方的角色卡数据，并执行以下修改任务：\n" +
+                          "1. 【核心任务】：将User的性别设定为【男性】，将指代User的代词改为“他”。\n" +
+                          "2. 【NSFW/生理修正】：\n" +
+                          "   - 识别这是两个男性的互动。\n" +
+                          "   - 如果文中有色情/亲密描写，必须根据【男性生理构造】修改器官和动作（例如：将女性特征改为后穴、肠液、前列腺、勃起等）。\n" +
+                          "   - 如果没有色情内容，则只修改性别代词。\n" +
+                          "3. 【格式死命令】：\n" +
+                          "   - 严禁删除换行符！严禁合并段落！\n" +
+                          "   - 严禁修改 XML 标签（如 <tag>）和列表符号。\n" +
+                          "   - 请按顺序输出修改后的内容，并保留原来的【标题】以便我区分。\n\n" +
+                          "==================== 以下是待修改内容 ====================\n\n";
 
-==================== 以下是待修改内容 ====================
-
-`;
-
-            // 2. 拼接角色基础信息
-            const map = [
+            // 角色基础信息
+            var map = [
                 ['description','【角色描述 description】'], 
                 ['first_mes','【开场白 first_mes】'], 
                 ['personality','【性格 personality】'], 
@@ -129,59 +119,63 @@
                 ['post_history_instructions','【后指令 post_history】']
             ];
 
-            map.forEach(item => {
-                if (globalData[item[0]]) {
-                    content += `\n### \({item[1]}\n\){globalData[item[0]]}\n\n----------------------------------------\n`;
+            for (var i = 0; i < map.length; i++) {
+                var key = map[i][0];
+                var title = map[i][1];
+                if (globalData[key]) {
+                    content += "\n### " + title + "\n" + globalData[key] + "\n\n----------------------------------------\n";
                 }
-            });
-
-            // 3. 拼接备用开场白
-            if (globalData.alternate_greetings) {
-                globalData.alternate_greetings.forEach((v, i) => {
-                    content += `\n### 【备用开场白 #\({i+1}】\n\){v}\n\n----------------------------------------\n`;
-                });
             }
 
-            // 4. 拼接世界书
-            let books = [];
+            // 备用开场白
+            if (globalData.alternate_greetings) {
+                for (var j = 0; j < globalData.alternate_greetings.length; j++) {
+                    content += "\n### 【备用开场白 #" + (j+1) + "】\n" + globalData.alternate_greetings[j] + "\n\n----------------------------------------\n";
+                }
+            }
+
+            // 世界书
+            var books = [];
             if (globalData.character_book && globalData.character_book.entries) books = globalData.character_book.entries;
+            else if (globalData.lorebook && globalData.lorebook.entries) books = globalData.lorebook.entries;
             
             if (books.length > 0) {
-                content += `\n\n========== 世界书 / 知识库条目 ==========\n`;
-                books.forEach((e, i) => {
-                    if (!e.content) return;
-                    const title = e.comment || (e.keys ? `Keys: \({e.keys.join(', ')}` : `Entry #\){i+1}`);
-                    content += `\n### 【世界书条目: \({title}】\n\){e.content}\n\n----------------------------------------\n`;
-                });
+                content += "\n\n========== 世界书 / 知识库条目 ==========\n";
+                for (var k = 0; k < books.length; k++) {
+                    var e = books[k];
+                    if (!e.content) continue;
+                    var entryTitle = e.comment || (e.keys ? "Keys: " + e.keys.join(', ') : "Entry #" + (k+1));
+                    content += "\n### 【世界书条目: " + entryTitle + "】\n" + e.content + "\n\n----------------------------------------\n";
+                }
             }
 
-            // 5. 触发下载
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
+            // 关键修复：添加 BOM (\uFEFF) 强制 UTF-8 编码，防止乱码
+            var blob = new Blob(["\uFEFF" + content], { type: 'text/plain;charset=utf-8' });
+            var url = URL.createObjectURL(blob);
+            var a = document.createElement('a');
             a.href = url;
-            a.download = `${globalFileName}_改写任务包.txt`; // 使用 .txt 确保兼容性
+            a.download = globalFileName + "_改写任务包.txt";
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
         }
 
-        // --- 文件处理逻辑 ---
+        // --- 文件解析 ---
         function handleFile(file) {
             if (!file) return;
-            globalFileName = file.name.replace(/\.[^/.]+$/, ""); // 去掉后缀
-            const reader = new FileReader();
+            globalFileName = file.name.replace(/\.[^/.]+$/, ""); 
+            var reader = new FileReader();
             reader.onload = function(e) {
-                const d = e.target.result;
-                if (file.name.toLowerCase().endsWith('.png')) {
-                    const txt = extractPng(new Uint8Array(d));
+                var d = e.target.result;
+                if (file.name.toLowerCase().indexOf('.png') !== -1) {
+                    var txt = extractPng(new Uint8Array(d));
                     if (!txt) return alert('无效 PNG');
                     parseData(txt);
                 } else {
                     parseData(d);
                 }
             };
-            if (file.name.toLowerCase().endsWith('.png')) {
+            if (file.name.toLowerCase().indexOf('.png') !== -1) {
                 reader.readAsArrayBuffer(file);
             } else {
                 reader.readAsText(file);
@@ -190,47 +184,47 @@
 
         function parseData(str) {
             try {
-                let d;
+                var d;
                 try { d = JSON.parse(str); } 
                 catch (e) { 
-                    const b = atob(str); 
-                    const arr = new Uint8Array(b.length);
-                    for(let i=0; i<b.length; i++) arr[i] = b.charCodeAt(i);
+                    var b = atob(str); 
+                    var arr = new Uint8Array(b.length);
+                    for(var i=0; i<b.length; i++) arr[i] = b.charCodeAt(i);
                     d = JSON.parse(new TextDecoder('utf-8').decode(arr));
                 }
                 
-                // 保存到全局变量，供导出使用
                 globalData = d.data || d;
                 
                 document.getElementById('dropZone').classList.add('hidden');
                 document.getElementById('contentArea').classList.remove('hidden');
-                document.getElementById('exportArea').classList.remove('hidden'); // 显示导出按钮
+                document.getElementById('exportArea').classList.remove('hidden');
                 
-                const cBox = document.getElementById('charContainer'); cBox.innerHTML = '';
-                const wBox = document.getElementById('worldContainer'); wBox.innerHTML = '';
+                var cBox = document.getElementById('charContainer'); cBox.innerHTML = '';
+                var wBox = document.getElementById('worldContainer'); wBox.innerHTML = '';
 
-                // 渲染预览界面 (保留原来的卡片功能，方便单独复制)
-                const map = [['description','描述'], ['first_mes','开场白'], ['personality','性格'], ['scenario','场景'], ['mes_example','示例'], ['system_prompt','系统提示'], ['post_history_instructions','后指令']];
+                // 预览渲染
+                var map = [['description','描述'], ['first_mes','开场白'], ['personality','性格'], ['scenario','场景'], ['mes_example','示例'], ['system_prompt','系统提示'], ['post_history_instructions','后指令']];
                 
-                map.forEach(item => {
-                    if (globalData[item[0]]) addCard(cBox, item[1], globalData[item[0]]);
-                });
+                for (var i = 0; i < map.length; i++) {
+                    if (globalData[map[i][0]]) addCard(cBox, map[i][1], globalData[map[i][0]]);
+                }
 
                 if (globalData.alternate_greetings) {
-                    globalData.alternate_greetings.forEach((v,i) => addCard(cBox, '备用 #'+(i+1), v));
+                    globalData.alternate_greetings.forEach(function(v,i) { addCard(cBox, '备用 #'+(i+1), v); });
                 }
                 if (globalData.group_only_greetings) {
-                    globalData.group_only_greetings.forEach((v,i) => addCard(cBox, '群聊 #'+(i+1), v));
+                    globalData.group_only_greetings.forEach(function(v,i) { addCard(cBox, '群聊 #'+(i+1), v); });
                 }
 
-                let books = [];
+                var books = [];
                 if (globalData.character_book && globalData.character_book.entries) books = globalData.character_book.entries;
+                else if (globalData.lorebook && globalData.lorebook.entries) books = globalData.lorebook.entries;
                 
                 document.getElementById('worldCount').innerText = books.length + ' 条目';
                 
-                books.forEach((e,i) => {
+                books.forEach(function(e,i) {
                     if (!e.content) return;
-                    const t = e.comment || (e.keys ? 'Keys: '+e.keys.join(', ') : '#'+(i+1));
+                    var t = e.comment || (e.keys ? 'Keys: '+e.keys.join(', ') : '#'+(i+1));
                     addCard(wBox, t, e.content);
                 });
 
@@ -238,19 +232,19 @@
         }
 
         function addCard(box, title, text) {
-            const div = document.createElement('div'); div.className = 'card';
+            var div = document.createElement('div'); div.className = 'card';
             
-            const header = document.createElement('div'); header.className = 'card-header';
-            const span = document.createElement('span'); span.className = 'truncate mr-2'; span.innerText = title;
-            const btn = document.createElement('button'); 
+            var header = document.createElement('div'); header.className = 'card-header';
+            var span = document.createElement('span'); span.className = 'truncate mr-2'; span.innerText = title;
+            var btn = document.createElement('button'); 
             btn.className = 'btn btn-copy-sm'; 
             btn.innerText = '复制';
             btn.onclick = function() { copy(this); };
 
             header.appendChild(span); header.appendChild(btn);
 
-            const body = document.createElement('div'); body.className = 'card-body';
-            const txtDiv = document.createElement('div'); txtDiv.className = 'text-content';
+            var body = document.createElement('div'); body.className = 'card-body';
+            var txtDiv = document.createElement('div'); txtDiv.className = 'text-content';
             txtDiv.innerText = text;
 
             body.appendChild(txtDiv);
@@ -259,25 +253,25 @@
         }
 
         function copy(btn) {
-            const txt = btn.parentElement.nextElementSibling.innerText;
-            navigator.clipboard.writeText(txt).then(() => {
-                const old = btn.innerText; btn.innerText = 'OK';
-                setTimeout(() => btn.innerText = old, 1000);
+            var txt = btn.parentElement.nextElementSibling.innerText;
+            navigator.clipboard.writeText(txt).then(function() {
+                var old = btn.innerText; btn.innerText = 'OK';
+                setTimeout(function() { btn.innerText = old; }, 1000);
             });
         }
 
         function extractPng(buf) {
-            const view = new DataView(buf.buffer); let p=8; const dec = new TextDecoder('utf-8');
+            var view = new DataView(buf.buffer); var p=8; var dec = new TextDecoder('utf-8');
             while(p < buf.length) {
-                const len = view.getUint32(p); 
-                const type = dec.decode(buf.slice(p+4, p+8));
+                var len = view.getUint32(p); 
+                var type = dec.decode(buf.slice(p+4, p+8));
                 if(type === 'tEXt' || type === 'iTXt') {
-                    const d = buf.slice(p+8, p+8+len); 
-                    const split = d.indexOf(0);
+                    var d = buf.slice(p+8, p+8+len); 
+                    var split = d.indexOf(0);
                     if(dec.decode(d.slice(0, split)) === 'chara') {
                         if (type === 'tEXt') return dec.decode(d.slice(split+1));
                         else {
-                            let p2 = split + 3;
+                            var p2 = split + 3;
                             while (p2 < d.length && d[p2] !== 0) p2++; p2++;
                             while (p2 < d.length && d[p2] !== 0) p2++; p2++;
                             return dec.decode(d.slice(p2));
