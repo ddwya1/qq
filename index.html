@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡解析助手 (BL专用版)</title>
+    <title>角色卡打包助手 (AI专用版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body { background-color: #09090b; color: #e4e4e7; font-family: sans-serif; padding-bottom: 40px; }
@@ -18,29 +18,25 @@
             padding: 12px 16px;
             display: flex; justify-content: center; align-items: center;
         }
-        .nav-title { font-weight: 800; font-size: 1.1rem; color: #60a5fa; }
+        .nav-title { font-weight: 800; font-size: 1.1rem; color: #a78bfa; }
         
-        /* 提示词区域 */
-        .prompt-box {
-            background: #18181b; border: 1px solid #3b82f6; 
+        /* 导出区域 */
+        .export-box {
+            background: #18181b; border: 1px solid #8b5cf6; 
             border-radius: 12px; padding: 16px; margin: 16px;
-            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.1);
-        }
-        .prompt-text {
-            background: #09090b; color: #93c5fd; padding: 10px;
-            font-size: 12px; line-height: 1.5; border-radius: 8px;
-            border: 1px dashed #3b82f6; margin-bottom: 10px;
-            white-space: pre-wrap;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15);
         }
 
         /* 按钮 */
         .btn {
             display: flex; justify-content: center; align-items: center;
-            padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 14px;
+            padding: 12px 20px; border-radius: 8px; font-weight: 600; font-size: 15px;
             border: none; cursor: pointer; transition: transform 0.1s; width: 100%;
+            margin-top: 10px;
         }
         .btn:active { transform: scale(0.98); }
-        .btn-blue { background: #2563eb; color: white; }
+        .btn-purple { background: #7c3aed; color: white; }
         .btn-copy-sm { background: #374151; color: white; padding: 4px 10px; font-size: 12px; width: auto; }
 
         /* 卡片样式 */
@@ -65,27 +61,17 @@
 <body>
 
     <div class="navbar">
-        <div class="nav-title">🧬 角色卡解析助手</div>
+        <div class="nav-title">🧬 角色卡打包助手</div>
     </div>
 
-    <!-- 1. 专用提示词区域 -->
-    <div class="prompt-box">
-        <div class="flex justify-between items-center mb-2">
-            <span class="text-xs font-bold text-blue-400">✨ 改写提示词 (BL/男男专用)</span>
+    <!-- 1. 导出区域 (默认隐藏，上传后显示) -->
+    <div id="exportArea" class="hidden">
+        <div class="export-box">
+            <div class="text-sm font-bold text-purple-400 mb-2">🚀 准备就绪</div>
+            <p class="text-xs text-gray-400 mb-3">已提取所有内容并附带 BL/NSFW 改写指令</p>
+            <button class="btn btn-purple" onclick="downloadForAI()">📥 下载 TXT 发给 AI</button>
+            <p class="text-[10px] text-gray-500 mt-2">提示：下载后直接把文件拖给 ChatGPT/Claude 即可</p>
         </div>
-        <!-- 这里是你要发给 AI 的话 -->
-        <div id="promptText" class="prompt-text">你是一个专业的BL小说改写助手。请帮我修改发送给你的文本：
-1. 【核心任务】：将User的性别设定为【男性】，将指代User的代词改为“他”。
-2. 【NSFW/生理修正】：
-   - 识别这是两个男性的互动。
-   - 如果文中有色情/亲密描写，必须根据【男性生理构造】修改器官和动作（例如：将女性特征改为后穴、肠液、前列腺、勃起等）。
-   - 如果没有色情内容，则只修改性别代词。
-3. 【格式死命令】：
-   - 严禁删除换行符！严禁合并段落！
-   - 严禁修改 XML 标签（如 <tag>）和列表符号。
-   - 保持原文的排版格式一模一样。
-4. 直接输出修改后的文本，不要任何解释。</div>
-        <button class="btn btn-blue" onclick="copyPrompt()">📋 一键复制提示词</button>
     </div>
 
     <!-- 2. 上传区域 -->
@@ -95,9 +81,9 @@
         <div class="text-sm">点击上传角色卡 (PNG/JSON)</div>
     </div>
 
-    <!-- 3. 内容列表 -->
+    <!-- 3. 内容预览列表 -->
     <div id="contentArea" class="hidden px-4 pb-10">
-        <div class="text-xs font-bold text-gray-500 mb-2 mt-4 uppercase">基础信息</div>
+        <div class="text-xs font-bold text-gray-500 mb-2 mt-4 uppercase">预览内容 (可单独复制)</div>
         <div id="charContainer"></div>
 
         <div class="flex justify-between items-end mb-2 mt-6">
@@ -108,24 +94,82 @@
     </div>
 
     <script>
-        // 复制提示词
-        function copyPrompt() {
-            const text = document.getElementById('promptText').innerText;
-            navigator.clipboard.writeText(text).then(() => {
-                const btn = document.querySelector('.btn-blue');
-                const oldText = btn.innerText;
-                btn.innerText = '✅ 已复制，去发给AI吧';
-                btn.style.backgroundColor = '#10b981';
-                setTimeout(() => {
-                    btn.innerText = oldText;
-                    btn.style.backgroundColor = '#2563eb';
-                }, 2000);
+        // 全局变量存储解析后的数据
+        let globalData = null;
+        let globalFileName = "character";
+
+        // --- 核心：打包下载功能 ---
+        function downloadForAI() {
+            if (!globalData) return alert('没有数据');
+
+            // 1. 准备提示词 (BL/NSFW 专用)
+            let content = `【指令】：你是一个专业的BL小说改写助手。请读取下方的角色卡数据，并执行以下修改任务：
+1. 【核心任务】：将User的性别设定为【男性】，将指代User的代词改为“他”。
+2. 【NSFW/生理修正】：
+   - 识别这是两个男性的互动。
+   - 如果文中有色情/亲密描写，必须根据【男性生理构造】修改器官和动作（例如：将女性特征改为后穴、肠液、前列腺、勃起等）。
+   - 如果没有色情内容，则只修改性别代词。
+3. 【格式死命令】：
+   - 必须保留所有的 XML 标签（如 <tag>）和列表符号。
+   - 严禁删除换行符！严禁合并段落！
+   - 请按顺序输出修改后的内容，并保留原来的【标题】以便我区分。
+
+==================== 以下是待修改内容 ====================
+
+`;
+
+            // 2. 拼接角色基础信息
+            const map = [
+                ['description','【角色描述 description】'], 
+                ['first_mes','【开场白 first_mes】'], 
+                ['personality','【性格 personality】'], 
+                ['scenario','【场景 scenario】'], 
+                ['mes_example','【对话示例 mes_example】'], 
+                ['system_prompt','【系统提示 system_prompt】'], 
+                ['post_history_instructions','【后指令 post_history】']
+            ];
+
+            map.forEach(item => {
+                if (globalData[item[0]]) {
+                    content += `\n### \({item[1]}\n\){globalData[item[0]]}\n\n----------------------------------------\n`;
+                }
             });
+
+            // 3. 拼接备用开场白
+            if (globalData.alternate_greetings) {
+                globalData.alternate_greetings.forEach((v, i) => {
+                    content += `\n### 【备用开场白 #\({i+1}】\n\){v}\n\n----------------------------------------\n`;
+                });
+            }
+
+            // 4. 拼接世界书
+            let books = [];
+            if (globalData.character_book && globalData.character_book.entries) books = globalData.character_book.entries;
+            
+            if (books.length > 0) {
+                content += `\n\n========== 世界书 / 知识库条目 ==========\n`;
+                books.forEach((e, i) => {
+                    if (!e.content) return;
+                    const title = e.comment || (e.keys ? `Keys: \({e.keys.join(', ')}` : `Entry #\){i+1}`);
+                    content += `\n### 【世界书条目: \({title}】\n\){e.content}\n\n----------------------------------------\n`;
+                });
+            }
+
+            // 5. 触发下载
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${globalFileName}_改写任务包.txt`; // 使用 .txt 确保兼容性
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
-        // 文件处理逻辑 (保持原样)
+        // --- 文件处理逻辑 ---
         function handleFile(file) {
             if (!file) return;
+            globalFileName = file.name.replace(/\.[^/.]+$/, ""); // 去掉后缀
             const reader = new FileReader();
             reader.onload = function(e) {
                 const d = e.target.result;
@@ -155,32 +199,33 @@
                     d = JSON.parse(new TextDecoder('utf-8').decode(arr));
                 }
                 
-                const data = d.data || d;
+                // 保存到全局变量，供导出使用
+                globalData = d.data || d;
+                
                 document.getElementById('dropZone').classList.add('hidden');
                 document.getElementById('contentArea').classList.remove('hidden');
+                document.getElementById('exportArea').classList.remove('hidden'); // 显示导出按钮
                 
                 const cBox = document.getElementById('charContainer'); cBox.innerHTML = '';
                 const wBox = document.getElementById('worldContainer'); wBox.innerHTML = '';
 
-                // 基础字段
+                // 渲染预览界面 (保留原来的卡片功能，方便单独复制)
                 const map = [['description','描述'], ['first_mes','开场白'], ['personality','性格'], ['scenario','场景'], ['mes_example','示例'], ['system_prompt','系统提示'], ['post_history_instructions','后指令']];
                 
                 map.forEach(item => {
-                    if (data[item[0]]) addCard(cBox, item[1], data[item[0]]);
+                    if (globalData[item[0]]) addCard(cBox, item[1], globalData[item[0]]);
                 });
 
-                if (data.alternate_greetings) {
-                    data.alternate_greetings.forEach((v,i) => addCard(cBox, '备用 #'+(i+1), v));
+                if (globalData.alternate_greetings) {
+                    globalData.alternate_greetings.forEach((v,i) => addCard(cBox, '备用 #'+(i+1), v));
                 }
-                if (data.group_only_greetings) {
-                    data.group_only_greetings.forEach((v,i) => addCard(cBox, '群聊 #'+(i+1), v));
+                if (globalData.group_only_greetings) {
+                    globalData.group_only_greetings.forEach((v,i) => addCard(cBox, '群聊 #'+(i+1), v));
                 }
 
-                // 世界书
                 let books = [];
-                if (data.character_book && data.character_book.entries) books = data.character_book.entries;
-                else if (d.character_book && d.character_book.entries) books = d.character_book.entries;
-
+                if (globalData.character_book && globalData.character_book.entries) books = globalData.character_book.entries;
+                
                 document.getElementById('worldCount').innerText = books.length + ' 条目';
                 
                 books.forEach((e,i) => {
