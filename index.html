@@ -2,286 +2,280 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>角色卡打包助手 (防乱码修复版)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BL角色卡回填工具 - 终极修复</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #09090b; color: #e4e4e7; font-family: sans-serif; padding-bottom: 40px; }
-        * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
+        body { background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%); min-height: 100vh; padding: 20px; color: #e2e8f0; font-family: sans-serif; }
+        .card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; padding: 24px; max-width: 800px; margin: 0 auto; box-shadow: 0 25px 50px rgba(0,0,0,0.5); }
+        .step { background: rgba(15, 23, 42, 0.6); border-left: 4px solid #818cf8; padding: 16px; margin: 16px 0; border-radius: 12px; }
+        .btn { padding: 12px 20px; border-radius: 10px; border: none; font-weight: 700; cursor: pointer; transition: 0.3s; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-primary { background: #6366f1; color: white; width: 100%; }
+        .btn-success { background: #10b981; color: white; width: 100%; }
+        .btn-copy { background: #f59e0b; color: white; }
+        .btn-small { padding: 8px 14px; font-size: 13px; width: auto; }
+        textarea { width: 100%; min-height: 200px; padding: 12px; background: #0f172a; color: #94a3b8; border: 1px solid #334155; border-radius: 10px; font-family: monospace; font-size: 13px; resize: vertical; margin-top: 10px; }
+        .upload-zone { border: 2px dashed #475569; border-radius: 16px; padding: 40px; text-align: center; cursor: pointer; transition: 0.3s; }
+        .upload-zone:hover { border-color: #818cf8; background: rgba(99, 102, 241, 0.1); }
         .hidden { display: none !important; }
-
-        .navbar {
-            position: sticky; top: 0; z-index: 50;
-            background: rgba(24, 24, 27, 0.95); backdrop-filter: blur(12px);
-            border-bottom: 1px solid #27272a;
-            padding: 12px 16px;
-            display: flex; justify-content: center; align-items: center;
-        }
-        .nav-title { font-weight: 800; font-size: 1.1rem; color: #a78bfa; }
-        
-        .export-box {
-            background: #18181b; border: 1px solid #8b5cf6; 
-            border-radius: 12px; padding: 16px; margin: 16px;
-            text-align: center;
-            box-shadow: 0 4px 20px rgba(139, 92, 246, 0.15);
-        }
-
-        .btn {
-            display: flex; justify-content: center; align-items: center;
-            padding: 12px 20px; border-radius: 8px; font-weight: 600; font-size: 15px;
-            border: none; cursor: pointer; transition: transform 0.1s; width: 100%;
-            margin-top: 10px;
-        }
-        .btn:active { transform: scale(0.98); }
-        .btn-purple { background: #7c3aed; color: white; }
-        .btn-copy-sm { background: #374151; color: white; padding: 4px 10px; font-size: 12px; width: auto; }
-
-        .card { background: #18181b; border: 1px solid #27272a; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
-        .card-header { 
-            background: #27272a; padding: 10px 14px; font-size: 13px; font-weight: bold; color: #a1a1aa; 
-            display: flex; justify-content: space-between; align-items: center;
-        }
-        .text-content {
-            background: #09090b; color: #d4d4d8; padding: 14px; 
-            font-family: monospace; font-size: 13px; line-height: 1.6;
-            white-space: pre-wrap; word-break: break-all;
-            border-top: 1px solid #27272a;
-        }
-
-        .upload-box { 
-            border: 2px dashed #3f3f46; border-radius: 12px; padding: 40px 20px; 
-            text-align: center; color: #71717a; margin: 16px; 
-        }
+        .segment-box { background: rgba(51, 65, 85, 0.4); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 16px; margin: 12px 0; }
+        .segment-title { font-weight: 700; color: #c7d2fe; margin-bottom: 8px; font-size: 14px; }
+        .log { background: #000; color: #4ade80; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 12px; margin-top: 10px; white-space: pre-wrap; }
     </style>
 </head>
 <body>
 
-    <div class="navbar">
-        <div class="nav-title">🧬 角色卡打包助手</div>
+<div class="card">
+    <div style="text-align: center; margin-bottom: 24px;">
+        <h1 style="font-size: 24px; font-weight: 900; color: #818cf8;">🔄 BL角色卡回填工具</h1>
+        <p style="color: #94a3b8; font-size: 13px; margin-top: 4px;">[ 修复导入失败 + 完美 V2 规格 ]</p>
     </div>
 
-    <!-- 1. 导出区域 -->
-    <div id="exportArea" class="hidden">
-        <div class="export-box">
-            <div class="text-sm font-bold text-purple-400 mb-2">🚀 解析成功</div>
-            <p class="text-xs text-gray-400 mb-3">已提取全部内容 + 注入BL改写指令</p>
-            <button class="btn btn-purple" onclick="downloadForAI()">📥 下载 .txt (发给AI)</button>
+    <!-- 步骤1 -->
+    <div class="step">
+        <h2 style="font-weight: 700; margin-bottom: 12px;">📁 步骤1：上传原始角色卡</h2>
+        <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+            <input type="file" id="fileInput" class="hidden" accept=".png,.json" onchange="loadCard(event)">
+            <div id="uploadText">
+                <div style="font-size: 40px; margin-bottom: 8px;">🖼️</div>
+                <div style="font-size: 15px; font-weight: 600;">点击上传 PNG 或 JSON</div>
+            </div>
+        </div>
+        <div id="cardInfo" class="hidden" style="background: rgba(99, 102, 241, 0.2); padding: 10px; border-radius: 8px; margin-top: 12px; font-size: 13px; color: #c7d2fe;">
+            <div id="cardDetails"></div>
         </div>
     </div>
 
-    <!-- 2. 上传区域 -->
-    <div id="dropZone" class="upload-box" onclick="document.getElementById('fileInput').click()">
-        <input type="file" id="fileInput" class="hidden" accept=".png,.json" onchange="handleFile(this.files[0])">
-        <div class="text-4xl mb-2">📂</div>
-        <div class="text-sm">点击上传角色卡 (PNG/JSON)</div>
-    </div>
-
-    <!-- 3. 预览区域 -->
-    <div id="contentArea" class="hidden px-4 pb-10">
-        <div class="text-xs font-bold text-gray-500 mb-2 mt-4 uppercase">预览内容</div>
-        <div id="charContainer"></div>
-        <div class="flex justify-between items-end mb-2 mt-6">
-            <div class="text-xs font-bold text-gray-500 uppercase">世界书</div>
-            <div id="worldCount" class="text-xs text-gray-600"></div>
+    <!-- 步骤2 -->
+    <div id="step2" class="step hidden">
+        <h2 style="font-weight: 700; margin-bottom: 12px;">🔀 步骤2：选择处理模式</h2>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" onclick="selectMode('full')">📄 完整处理</button>
+            <button class="btn btn-primary" onclick="selectMode('segment')">📑 分段处理</button>
         </div>
-        <div id="worldContainer"></div>
     </div>
 
-    <script>
-        var globalData = null;
-        var globalFileName = "character";
+    <!-- 步骤3A -->
+    <div id="step3Full" class="step hidden">
+        <h2 style="font-weight: 700; margin-bottom: 10px;">📝 粘贴AI改写结果</h2>
+        <textarea id="aiResultFull" placeholder="在此粘贴AI的完整回复..."></textarea>
+        <button class="btn btn-success" onclick="rebuildFull()" style="margin-top: 12px;">🚀 生成新角色卡</button>
+        <div id="logFull" class="log hidden"></div>
+    </div>
 
-        // --- 核心：打包下载 (修复乱码和变量不显示) ---
-        function downloadForAI() {
-            if (!globalData) return alert('没有数据');
+    <!-- 步骤3B -->
+    <div id="step3Segment" class="step hidden">
+        <h2 style="font-weight: 700; margin-bottom: 10px;">📑 分段任务列表</h2>
+        <div id="segmentContainer"></div>
+        <button class="btn btn-success" onclick="rebuildSegment()" style="margin-top: 16px;">🔨 合成新角色卡</button>
+        <div id="logSegment" class="log hidden"></div>
+    </div>
+</div>
 
-            // 使用最原始的字符串拼接，防止 ${} 失效
-            var content = "【指令】：你是一个专业的BL小说改写助手。请读取下方的角色卡数据，并执行以下修改任务：\n" +
-                          "1. 【核心任务】：将User的性别设定为【男性】，将指代User的代词改为“他”。\n" +
-                          "2. 【NSFW/生理修正】：\n" +
-                          "   - 识别这是两个男性的互动。\n" +
-                          "   - 如果文中有色情/亲密描写，必须根据【男性生理构造】修改器官和动作（例如：将女性特征改为后穴、肠液、前列腺、勃起等）。\n" +
-                          "   - 如果没有色情内容，则只修改性别代词。\n" +
-                          "3. 【格式死命令】：\n" +
-                          "   - 严禁删除换行符！严禁合并段落！\n" +
-                          "   - 严禁修改 XML 标签（如 <tag>）和列表符号。\n" +
-                          "   - 请按顺序输出修改后的内容，并保留原来的【标题】以便我区分。\n\n" +
-                          "==================== 以下是待修改内容 ====================\n\n";
+<script>
+let originalFullJson = null; 
+let cardData = null; 
+let cardName = "character";
+let segmentList = [];
 
-            // 角色基础信息
-            var map = [
-                ['description','【角色描述 description】'], 
-                ['first_mes','【开场白 first_mes】'], 
-                ['personality','【性格 personality】'], 
-                ['scenario','【场景 scenario】'], 
-                ['mes_example','【对话示例 mes_example】'], 
-                ['system_prompt','【系统提示 system_prompt】'], 
-                ['post_history_instructions','【后指令 post_history】']
-            ];
+// ========== 核心：万能解码函数 ==========
+function decodeBase64Unicode(str) {
+    try {
+        const binaryString = window.atob(str);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i++) bytes[i] = binaryString.charCodeAt(i);
+        return new TextDecoder('utf-8').decode(bytes);
+    } catch (e) { return null; }
+}
 
-            for (var i = 0; i < map.length; i++) {
-                var key = map[i][0];
-                var title = map[i][1];
-                if (globalData[key]) {
-                    content += "\n### " + title + "\n" + globalData[key] + "\n\n----------------------------------------\n";
-                }
+// ========== 核心：JSON 下载 (禁止加 BOM) ==========
+function downloadJson(obj, fileName) {
+    const content = JSON.stringify(obj, null, 2);
+    // JSON 绝对不能加 BOM，否则酒馆会报错
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+}
+
+// ========== 核心：TXT 下载 (保留 BOM 解决乱码) ==========
+function downloadTxt(content, fileName) {
+    const encoder = new TextEncoder();
+    const uint8Array = encoder.encode(content);
+    const bom = new Uint8Array([0xEF, 0xBB, 0xBF]);
+    const finalArray = new Uint8Array(bom.length + uint8Array.length);
+    finalArray.set(bom);
+    finalArray.set(uint8Array, bom.length);
+    const blob = new Blob([finalArray], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+}
+
+async function loadCard(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    cardName = file.name.replace(/\.(png|json)$/i, '');
+    try {
+        let rawText;
+        if (file.name.toLowerCase().endsWith('.png')) {
+            const buffer = await file.arrayBuffer();
+            rawText = extractTextFromPNG(new Uint8Array(buffer));
+            if (!rawText) throw new Error("PNG中未找到数据");
+            try { JSON.parse(rawText); } catch (e) { rawText = decodeBase64Unicode(rawText); }
+        } else {
+            rawText = await file.text();
+        }
+        
+        let json = JSON.parse(rawText);
+        originalFullJson = json;
+        cardData = json.data || json; 
+        
+        document.getElementById('cardInfo').classList.remove('hidden');
+        document.getElementById('cardDetails').innerHTML = '✅ 已加载角色: <strong>' + (cardData.name || '未知') + '</strong>';
+        document.getElementById('step2').classList.remove('hidden');
+    } catch (e) { alert('解析失败: ' + e.message); }
+}
+
+function selectMode(mode) {
+    document.getElementById('step3Full').classList.toggle('hidden', mode !== 'full');
+    document.getElementById('step3Segment').classList.toggle('hidden', mode !== 'segment');
+    if (mode === 'segment') generateSegments();
+}
+
+function generateSegments() {
+    const container = document.getElementById('segmentContainer');
+    container.innerHTML = ''; segmentList = [];
+    const basicFields = ['description', 'personality', 'scenario', 'first_mes', 'mes_example', 'system_prompt', 'post_history_instructions'];
+    segmentList.push({ id: 'basic', title: '基础信息', fields: basicFields });
+    const alts = cardData.alternate_greetings || [];
+    for (let i = 0; i < alts.length; i += 5) segmentList.push({ id: 'alt_'+i, title: '备用开场白 '+(i+1)+'-'+Math.min(i+5, alts.length), altStart: i, altEnd: Math.min(i+5, alts.length) });
+    const books = cardData.character_book?.entries || cardData.lorebook?.entries || [];
+    for (let i = 0; i < books.length; i += 10) segmentList.push({ id: 'book_'+i, title: '世界书条目 '+(i+1)+'-'+Math.min(i+10, books.length), bookStart: i, bookEnd: Math.min(i+10, books.length) });
+
+    segmentList.forEach(seg => {
+        const div = document.createElement('div');
+        div.className = 'segment-box';
+        div.innerHTML = '<div class="segment-title">'+seg.title+'</div>' +
+            '<div style=\"display:flex; gap:8px;\"><button class=\"btn btn-copy btn-small\" onclick=\"copySeg(\''+seg.id+'\', this)\">📋 复制任务</button>' +
+            '<button class=\"btn btn-primary btn-small\" onclick=\"dlSeg(\''+seg.id+'\')\">📥 下载</button></div>' +
+            '<textarea id=\"res_'+seg.id+'\" placeholder=\"在此粘贴该段改写结果...\"></textarea>';
+        container.appendChild(div);
+    });
+}
+
+function getSegContent(id) {
+    const seg = segmentList.find(s => s.id === id);
+    let content = '【指令】：你是一个专业的BL小说改写助手。请读取下方的角色卡数据，并执行以下修改任务：\n' +
+                  '1. 【核心任务】：将User的性别设定为【男性】，将指代User的代词改为"他"。\n' +
+                  '2. 【NSFW/生理修正】：识别这是两个男性的互动。修改器官和动作（例如：后穴、肠液、前列腺、勃起等）。\n' +
+                  '3. 【格式死命令】：严禁删除换行符！必须保留所有 ### 【标题】 格式！\n\n' +
+                  '==================== 待修改内容 ====================\n\n';
+
+    if (seg.fields) {
+        const map = { description:'角色描述 description', personality:'性格 personality', scenario:'场景 scenario', first_mes:'开场白 first_mes', mes_example:'对话示例 mes_example', system_prompt:'系统提示 system_prompt', post_history_instructions:'后指令 post_history_instructions' };
+        seg.fields.forEach(f => { if(cardData[f]) content += '### 【'+map[f]+'】\n'+cardData[f]+'\n\n--------------------\n\n'; });
+    }
+    if (seg.altStart !== undefined) {
+        for(let i=seg.altStart; i<seg.altEnd; i++) content += '### 【备用开场白 #'+(i+1)+'】\n'+cardData.alternate_greetings[i]+'\n\n--------------------\n\n';
+    }
+    if (seg.bookStart !== undefined) {
+        const books = cardData.character_book?.entries || cardData.lorebook?.entries || [];
+        for(let i=seg.bookStart; i<seg.bookEnd; i++) {
+            const e = books[i];
+            content += '### 【世界书条目: '+(e.comment || e.keys?.[0] || i)+'】\n'+e.content+'\n\n--------------------\n\n';
+        }
+    }
+    return content;
+}
+
+function copySeg(id, btn) {
+    const text = getSegContent(id);
+    const el = document.createElement('textarea'); el.value = text; document.body.appendChild(el);
+    el.select(); document.execCommand('copy'); document.body.removeChild(el);
+    const old = btn.innerHTML; btn.innerHTML = '✅ 已复制'; setTimeout(() => btn.innerHTML = old, 1500);
+}
+
+function dlSeg(id) { downloadTxt(getSegContent(id), cardName + '_分段.txt'); }
+
+function rebuildFull() {
+    const text = document.getElementById('aiResultFull').value;
+    const log = document.getElementById('logFull'); log.classList.remove('hidden');
+    const finalJson = processText(text, log);
+    if (finalJson) downloadJson(finalJson, cardName + '_BL版.json');
+}
+
+function rebuildSegment() {
+    let combinedText = '';
+    segmentList.forEach(seg => { combinedText += document.getElementById('res_'+seg.id).value + '\n\n'; });
+    const log = document.getElementById('logSegment'); log.classList.remove('hidden');
+    const finalJson = processText(combinedText, log);
+    if (finalJson) downloadJson(finalJson, cardName + '_BL版.json');
+}
+
+function processText(aiText, logBox) {
+    let count = 0;
+    const newData = JSON.parse(JSON.stringify(cardData));
+
+    function ext(pattern) {
+        // 极致优化正则：确保不抓取标题末尾的 】 符号
+        const r = new RegExp('###\\s*【(?:' + pattern + ')[^】]*】\\s*\\n?([\\s\\S]*?)(?=\\n###|\\n-{10,}|$)', 'i');
+        const m = aiText.match(r);
+        if (m && m[1]) { 
+            count++; 
+            return m[1].trim(); 
+        }
+        return null;
+    }
+
+    const basics = { description:'角色描述|description', first_mes:'开场白|first_mes', personality:'性格|personality', scenario:'场景|scenario', mes_example:'对话示例|mes_example', system_prompt:'系统提示|system_prompt', post_history_instructions:'后指令|post_history' };
+    for (let [k, p] of Object.entries(basics)) { const c = ext(p); if(c) newData[k] = c; }
+    
+    if (newData.alternate_greetings) {
+        for (let i=0; i<newData.alternate_greetings.length; i++) { 
+            const c = ext('备用开场白\\s*#'+(i+1)); if(c) newData.alternate_greetings[i] = c; 
+        }
+    }
+    
+    const books = newData.character_book?.entries || newData.lorebook?.entries || [];
+    books.forEach((e, i) => {
+        let c = ext('世界书条目[：:]\\s*'+(e.comment || ''));
+        if(!c) c = ext('世界书条目[：:]\\s*'+(e.keys?.[0] || ''));
+        if(c) e.content = c;
+    });
+
+    logBox.innerHTML = '成功更新 ' + count + ' 个字段！\n规格验证：SillyTavern V2 标准';
+    
+    // 返回标准 V2 结构
+    return {
+        spec: "chara_card_v2",
+        spec_version: "2.0",
+        data: newData
+    };
+}
+
+function extractTextFromPNG(u8) {
+    let p = 8; const dec = new TextDecoder();
+    while (p < u8.length) {
+        const len = new DataView(u8.buffer).getUint32(p);
+        const type = dec.decode(u8.slice(p+4, p+8));
+        if (type === 'tEXt' || type === 'iTXt') {
+            const d = u8.slice(p+8, p+8+len);
+            const s = d.indexOf(0);
+            const keyword = dec.decode(d.slice(0, s));
+            if (keyword === 'chara') {
+                return type === 'tEXt' ? dec.decode(d.slice(s+1)) : new TextDecoder('utf-8').decode(d.slice(s+3));
             }
-
-            // 备用开场白
-            if (globalData.alternate_greetings) {
-                for (var j = 0; j < globalData.alternate_greetings.length; j++) {
-                    content += "\n### 【备用开场白 #" + (j+1) + "】\n" + globalData.alternate_greetings[j] + "\n\n----------------------------------------\n";
-                }
-            }
-
-            // 世界书
-            var books = [];
-            if (globalData.character_book && globalData.character_book.entries) books = globalData.character_book.entries;
-            else if (globalData.lorebook && globalData.lorebook.entries) books = globalData.lorebook.entries;
-            
-            if (books.length > 0) {
-                content += "\n\n========== 世界书 / 知识库条目 ==========\n";
-                for (var k = 0; k < books.length; k++) {
-                    var e = books[k];
-                    if (!e.content) continue;
-                    var entryTitle = e.comment || (e.keys ? "Keys: " + e.keys.join(', ') : "Entry #" + (k+1));
-                    content += "\n### 【世界书条目: " + entryTitle + "】\n" + e.content + "\n\n----------------------------------------\n";
-                }
-            }
-
-            // 关键修复：添加 BOM (\uFEFF) 强制 UTF-8 编码，防止乱码
-            var blob = new Blob(["\uFEFF" + content], { type: 'text/plain;charset=utf-8' });
-            var url = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            a.href = url;
-            a.download = globalFileName + "_改写任务包.txt";
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
         }
-
-        // --- 文件解析 ---
-        function handleFile(file) {
-            if (!file) return;
-            globalFileName = file.name.replace(/\.[^/.]+$/, ""); 
-            var reader = new FileReader();
-            reader.onload = function(e) {
-                var d = e.target.result;
-                if (file.name.toLowerCase().indexOf('.png') !== -1) {
-                    var txt = extractPng(new Uint8Array(d));
-                    if (!txt) return alert('无效 PNG');
-                    parseData(txt);
-                } else {
-                    parseData(d);
-                }
-            };
-            if (file.name.toLowerCase().indexOf('.png') !== -1) {
-                reader.readAsArrayBuffer(file);
-            } else {
-                reader.readAsText(file);
-            }
-        }
-
-        function parseData(str) {
-            try {
-                var d;
-                try { d = JSON.parse(str); } 
-                catch (e) { 
-                    var b = atob(str); 
-                    var arr = new Uint8Array(b.length);
-                    for(var i=0; i<b.length; i++) arr[i] = b.charCodeAt(i);
-                    d = JSON.parse(new TextDecoder('utf-8').decode(arr));
-                }
-                
-                globalData = d.data || d;
-                
-                document.getElementById('dropZone').classList.add('hidden');
-                document.getElementById('contentArea').classList.remove('hidden');
-                document.getElementById('exportArea').classList.remove('hidden');
-                
-                var cBox = document.getElementById('charContainer'); cBox.innerHTML = '';
-                var wBox = document.getElementById('worldContainer'); wBox.innerHTML = '';
-
-                // 预览渲染
-                var map = [['description','描述'], ['first_mes','开场白'], ['personality','性格'], ['scenario','场景'], ['mes_example','示例'], ['system_prompt','系统提示'], ['post_history_instructions','后指令']];
-                
-                for (var i = 0; i < map.length; i++) {
-                    if (globalData[map[i][0]]) addCard(cBox, map[i][1], globalData[map[i][0]]);
-                }
-
-                if (globalData.alternate_greetings) {
-                    globalData.alternate_greetings.forEach(function(v,i) { addCard(cBox, '备用 #'+(i+1), v); });
-                }
-                if (globalData.group_only_greetings) {
-                    globalData.group_only_greetings.forEach(function(v,i) { addCard(cBox, '群聊 #'+(i+1), v); });
-                }
-
-                var books = [];
-                if (globalData.character_book && globalData.character_book.entries) books = globalData.character_book.entries;
-                else if (globalData.lorebook && globalData.lorebook.entries) books = globalData.lorebook.entries;
-                
-                document.getElementById('worldCount').innerText = books.length + ' 条目';
-                
-                books.forEach(function(e,i) {
-                    if (!e.content) return;
-                    var t = e.comment || (e.keys ? 'Keys: '+e.keys.join(', ') : '#'+(i+1));
-                    addCard(wBox, t, e.content);
-                });
-
-            } catch(e) { console.error(e); alert('解析失败: ' + e.message); }
-        }
-
-        function addCard(box, title, text) {
-            var div = document.createElement('div'); div.className = 'card';
-            
-            var header = document.createElement('div'); header.className = 'card-header';
-            var span = document.createElement('span'); span.className = 'truncate mr-2'; span.innerText = title;
-            var btn = document.createElement('button'); 
-            btn.className = 'btn btn-copy-sm'; 
-            btn.innerText = '复制';
-            btn.onclick = function() { copy(this); };
-
-            header.appendChild(span); header.appendChild(btn);
-
-            var body = document.createElement('div'); body.className = 'card-body';
-            var txtDiv = document.createElement('div'); txtDiv.className = 'text-content';
-            txtDiv.innerText = text;
-
-            body.appendChild(txtDiv);
-            div.appendChild(header); div.appendChild(body);
-            box.appendChild(div);
-        }
-
-        function copy(btn) {
-            var txt = btn.parentElement.nextElementSibling.innerText;
-            navigator.clipboard.writeText(txt).then(function() {
-                var old = btn.innerText; btn.innerText = 'OK';
-                setTimeout(function() { btn.innerText = old; }, 1000);
-            });
-        }
-
-        function extractPng(buf) {
-            var view = new DataView(buf.buffer); var p=8; var dec = new TextDecoder('utf-8');
-            while(p < buf.length) {
-                var len = view.getUint32(p); 
-                var type = dec.decode(buf.slice(p+4, p+8));
-                if(type === 'tEXt' || type === 'iTXt') {
-                    var d = buf.slice(p+8, p+8+len); 
-                    var split = d.indexOf(0);
-                    if(dec.decode(d.slice(0, split)) === 'chara') {
-                        if (type === 'tEXt') return dec.decode(d.slice(split+1));
-                        else {
-                            var p2 = split + 3;
-                            while (p2 < d.length && d[p2] !== 0) p2++; p2++;
-                            while (p2 < d.length && d[p2] !== 0) p2++; p2++;
-                            return dec.decode(d.slice(p2));
-                        }
-                    }
-                }
-                p += 12+len;
-            }
-            return null;
-        }
-    </script>
+        p += 12 + len;
+    }
+    return null;
+}
+</script>
 </body>
 </html>
